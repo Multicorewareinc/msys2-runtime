@@ -233,13 +233,12 @@ public:
   ~pthread_key ();
   static void fixup_before_fork ()
   {
-    keys.for_each (&pthread_key::_fixup_before_fork);
+    for_each (&pthread_key::_fixup_before_fork);
   }
 
   static void fixup_after_fork ()
   {
-    keys.fixup_after_fork ();
-    keys.for_each (&pthread_key::_fixup_after_fork);
+    for_each (&pthread_key::_fixup_after_fork);
   }
 
   static void run_all_destructors ()
@@ -258,7 +257,7 @@ public:
     for (int i = 0; i < PTHREAD_DESTRUCTOR_ITERATIONS; ++i)
       {
 	iterate_dtors_once_more = false;
-	keys.for_each (&pthread_key::run_destructor);
+	for_each (&pthread_key::run_destructor);
 	if (!iterate_dtors_once_more)
 	  break;
       }
