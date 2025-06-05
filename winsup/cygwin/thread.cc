@@ -1966,7 +1966,12 @@ pthread_spinlock::lock ()
       else if (spins < FAST_SPINS_LIMIT)
         {
           ++spins;
+#if defined(__x86_64__)
           __asm__ volatile ("pause":::);
+#elif defined(__aarch64__)
+          __asm__ volatile ("dmb ishst\n"
+                            "yield":::);
+#endif
         }
       else
 	{
