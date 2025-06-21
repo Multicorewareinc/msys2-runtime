@@ -130,16 +130,6 @@ AC_ARG_ENABLE(utils,
 	      [AS_HELP_STRING([--disable-utils], [do not build utils])],,
 	      enable_utils=yes)
 AM_CONDITIONAL(BUILD_UTILS, [test $enable_utils != "no"])
-# --enable-mingw-utils: opt-in to build only the MinGW *host* tools in
-# utils/mingw (e.g. cygwin-console-helper) without the cygwin-linked utils in
-# utils/ (which stay behind --disable-utils).  Used by the ARM64 cross build to
-# ship individual MinGW utilities the same way the native x86_64 build does
-# (via `make`, not a hand-written compile line), while the ~26 cygwin-linked
-# utils remain deferred.  Default off => a no-op for every existing config.
-AC_ARG_ENABLE(mingw-utils,
-	      [AS_HELP_STRING([--enable-mingw-utils], [build the MinGW host tools in utils/mingw (e.g. cygwin-console-helper) without the cygwin-linked utils])],,
-	      enable_mingw_utils=no)
-AM_CONDITIONAL(BUILD_MINGW_UTILS, [test "x$enable_mingw_utils" = "xyes"])
 
 AC_CHECK_PROGS([DOCBOOK2XTEXI], [docbook2x-texi db2x_docbook2texi])
 if test -z "$DOCBOOK2XTEXI" ; then
