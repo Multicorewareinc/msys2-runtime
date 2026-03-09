@@ -68,9 +68,19 @@ TARGET_FILES= \
 	x86_64/wmempcpy.S
 endif
 
+NEWLIB_STRING_DIR= ../../newlib/libc/string
+
 if TARGET_AARCH64
 TARGET_FILES= \
-	aarch64/fastcwd.cc
+	aarch64/fastcwd.cc \
+	$(NEWLIB_STRING_DIR)/bcopy.c \
+	$(NEWLIB_STRING_DIR)/memchr.c \
+	$(NEWLIB_STRING_DIR)/mempcpy.c \
+	$(NEWLIB_STRING_DIR)/memset.c \
+	$(NEWLIB_STRING_DIR)/swab.c \
+	$(NEWLIB_STRING_DIR)/wmemcpy.c \
+	$(NEWLIB_STRING_DIR)/wmemmove.c \
+	$(NEWLIB_STRING_DIR)/wmempcpy.c
 endif
 
 # These objects are included directly into the import library
