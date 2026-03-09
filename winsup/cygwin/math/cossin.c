@@ -12,6 +12,7 @@ void sincos (double __x, double *p_sin, double *p_cos)
 {
   long double c, s;
 
+#if defined(__x86_64__)
   __asm__ __volatile__ ("fsincos\n\t"
     "fnstsw    %%ax\n\t"
     "testl     $0x400, %%eax\n\t"
@@ -26,6 +27,11 @@ void sincos (double __x, double *p_sin, double *p_cos)
     "fstp      %%st(1)\n\t"
     "fsincos\n\t"
     "1:" : "=t" (c), "=u" (s) : "0" (__x));
+#elif defined(__aarch64__)
+  // TODO
+  c = 0.0;
+  s = 0.0;
+#endif
   *p_sin = (double) s;
   *p_cos = (double) c;
 }
@@ -34,6 +40,7 @@ void sincosf (float __x, float *p_sin, float *p_cos)
 {
   long double c, s;
 
+#if defined(__x86_64__)
   __asm__ __volatile__ ("fsincos\n\t"
     "fnstsw    %%ax\n\t"
     "testl     $0x400, %%eax\n\t"
@@ -48,6 +55,11 @@ void sincosf (float __x, float *p_sin, float *p_cos)
     "fstp      %%st(1)\n\t"
     "fsincos\n\t"
     "1:" : "=t" (c), "=u" (s) : "0" (__x));
+#elif defined(__aarch64__)
+  // TODO
+  c = 0.0;
+  s = 0.0;
+#endif
   *p_sin = (float) s;
   *p_cos = (float) c;
 }
@@ -56,6 +68,7 @@ void sincosl (long double __x, long double *p_sin, long double *p_cos)
 {
   long double c, s;
 
+#if defined(__x86_64__)
   __asm__ __volatile__ ("fsincos\n\t"
     "fnstsw    %%ax\n\t"
     "testl     $0x400, %%eax\n\t"
@@ -70,6 +83,11 @@ void sincosl (long double __x, long double *p_sin, long double *p_cos)
     "fstp      %%st(1)\n\t"
     "fsincos\n\t"
     "1:" : "=t" (c), "=u" (s) : "0" (__x));
+#elif defined(__aarch64__)
+  // TODO
+  c = 0.0;
+  s = 0.0;
+#endif
   *p_sin = s;
   *p_cos = c;
 }

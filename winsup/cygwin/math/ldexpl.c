@@ -12,9 +12,14 @@ long double ldexpl(long double x, int expn)
   if (!isfinite (x) || x == 0.0L)
     return x;
 
+#if defined(__x86_64__) || defined(__i386__)
   __asm__ __volatile__ ("fscale"
 	    : "=t" (res)
 	    : "0" (x), "u" ((long double) expn));
+#elif defined(__aarch64__)
+  // TODO
+  res = 0.0L;
+#endif 
 
   if (!isfinite (res) || res == 0.0L)
     errno = ERANGE;
