@@ -34,7 +34,7 @@ __MINGW_USYMBOL(__cosl_internal):
 	movq	$0,8(%rcx)
 	fstpt (%rcx)
 	ret
-#else
+#elif __i386__
 	fldt	4(%esp)
 	fcos
 	fnstsw	%ax
@@ -51,5 +51,7 @@ __MINGW_USYMBOL(__cosl_internal):
 	fstp	%st(1)
 	fcos
 	ret
+#else
+  // TODO
 #endif
 
