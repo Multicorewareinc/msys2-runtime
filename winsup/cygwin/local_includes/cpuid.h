@@ -13,17 +13,23 @@ static inline void __attribute ((always_inline))
 cpuid (uint32_t *a, uint32_t *b, uint32_t *c, uint32_t *d, uint32_t ain,
        uint32_t cin = 0)
 {
+#if defined(__x86_64__)
   asm volatile ("cpuid"
 		: "=a" (*a), "=b" (*b), "=c" (*c), "=d" (*d)
 		: "a" (ain), "c" (cin));
+#elif defined(__aarch64__)
+  // TODO
+  *a = *b = *c = *d = 0;
+#endif
 }
 
-#ifdef __x86_64__
+#if defined(__x86_64__) || defined(__aarch64__)
 static inline bool __attribute ((always_inline))
 can_set_flag (uint32_t long flag)
 {
   uint32_t long r1, r2;
 
+#if defined(__x86_64__)
   asm volatile ("pushfq\n"
 		"popq %0\n"
 		"movq %0, %1\n"
@@ -37,6 +43,9 @@ can_set_flag (uint32_t long flag)
 		: "=&r" (r1), "=&r" (r2)
 		: "ir" (flag)
   );
+#elif defined(__aarch64__)
+  // TODO
+#endif
   return ((r1 ^ r2) & flag) != 0;
 }
 #else
