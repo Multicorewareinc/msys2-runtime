@@ -560,6 +560,10 @@ proc_CFLAGS=-DUSERNAME="\"$(USER)\"" -DHOSTNAME="\"$(HOSTNAME)\"" \
 
 dtable_CFLAGS=-fcheck-new
 
+if TARGET_AARCH64
+exceptions_CFLAGS = -mnop-fun-dllimport
+endif
+
 #
 # libraries and installed objects
 #
