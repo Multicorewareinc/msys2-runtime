@@ -140,7 +140,7 @@ extern void __malloc_unlock(struct _reent *);
 /* A compatibility routine for an earlier version of the allocator.  */
 
 extern void mstats (char *);
-#ifdef __CYGWIN__
+#if defined(__CYGWIN__)
 #undef _mstats_r
 #define _mstats_r(r, p) mstats (p)
 #else

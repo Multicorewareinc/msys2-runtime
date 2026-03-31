@@ -77,8 +77,10 @@ extern void *valloc (size_t);
 #define _pvalloc_r(r, s) pvalloc (s)
 #undef _malloc_trim_r
 #define _malloc_trim_r(r, s) malloc_trim (s)
+#if defined(__CYGWIN__) && !defined(__MSYS__)
 #undef _mstats_r
 #define _mstats_r(r, p) mstats (p)
+#endif
 
 #if __BSD_VISIBLE
 int getloadavg(double loadavg[], int nelem);
