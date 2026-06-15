@@ -364,7 +364,7 @@ export cygrun=$(builddir)/mingw/cygrun
 #
 
 check-local:
-	$(MKDIR_P) ${builddir}/testinst/tmp
+	$(MKDIR_P) ${builddir}/tmp
 	cd ${builddir}/testinst/bin && cp /usr/libexec/busybox/bin/busybox.exe sh.exe
 	cd ${builddir}/testinst/bin && cp /usr/libexec/busybox/bin/busybox.exe sleep.exe
 	cd ${builddir}/testinst/bin && cp /usr/libexec/busybox/bin/busybox.exe ls.exe
@@ -374,7 +374,7 @@ check_programs: $(check_PROGRAMS)
 
 clean-local:
 	rm -f *.stackdump
-	rm -rf ${builddir}/testinst/tmp
+	rm -rf ${builddir}/tmp
 
 if CROSS_BOOTSTRAP
 SUBDIRS = mingw
