@@ -106,66 +106,74 @@ jobs:
         icacls . /inheritance:r
         icacls . /grant Administrators:F
     - uses: actions/checkout@v3
-
-    # install cygwin and build tools
-    - name: Install Cygwin
-      uses: cygwin/cygwin-install-action@master
+    # install msys and build tools
+    - name: Install MSYS2
+      uses: msys2/setup-msys2@v2
       with:
-        platform: ${{ matrix.pkgarch }}
-        packages: >-
-          autoconf,
-          automake,
-          busybox,
-          cocom,
-          cygutils-extra,
-          dblatex,
-          dejagnu,
-          docbook-xml45,
-          docbook-xsl,
-          docbook2X,
-          gcc-g++,
-          gettext-devel,
-          libiconv,
-          libiconv-devel,
-          libzstd-devel,
-          make,
-          mingw64-${{ matrix.pkgarch }}-gcc-g++,
-          mingw64-${{ matrix.pkgarch }}-zlib,
-          patch,
-          perl,
-          python39-lxml,
-          python39-ply,
-          texlive-collection-fontsrecommended,
-          texlive-collection-latexrecommended,
-          texlive-collection-pictures,
-          xmlto,
+        msystem: MSYS
+        update: true
+        install: >-
+          msys2-devel
+          base-devel
+          autotools
+          cocom
+          dejagnu
+          gcc
+          gettext-devel
+          libiconv-devel
+          libzstd-devel
+          make
+          mingw-w64-cross-crt
+          mingw-w64-cross-gcc
+          mingw-w64-cross-zlib
+          perl
           zlib-devel
+    - name: Install cygutils
+      shell: msys2 {0}
+      run: |
+        pacman -S --noconfirm cygutils
+    - name: Patch unused variable warning
+      shell: msys2 {0}
+      run: |
+        sed -i 's/int count_path_items = 0;/int count_path_items = 0; (void)count_path_items;/' winsup/utils/mingw/cygcheck.cc
+    - name: Build
+      shell: msys2 {0}
+      run: |
+        (cd winsup && ./autogen.sh)
+        mkdir build && cd build
+        ../configure \
+          --prefix=/usr \
+          --disable-doc \
+          --disable-dumper
+        make -j$(nproc) MINGW_CXXFLAGS="-Wno-error=unused-but-set-variable"
+    - name: Install to staging directory
+      shell: msys2 {0}
+      run: |
+        cd build
+        # Install to _dest, never directly to /usr
+        # avoids fork failure from overwriting the running msys-2.0.dll
+        make DESTDIR="$(pwd)/../_dest" install
+    - name: Test
+      shell: msys2 {0}
+      run: |
+        export MAKEFLAGS=-j$(nproc)
+        # Paths derived from matrix.target
+        BUILDDIR=$(realpath build/${{ matrix.target }}/winsup)
+        TESTSUITE_BUILDDIR="${BUILDDIR}/testsuite"
+        CYGWIN_BUILDDIR="${BUILDDIR}/cygwin"
+        mkdir -p "${TESTSUITE_BUILDDIR}/testinst/bin"
+        cp "${CYGWIN_BUILDDIR}/new-msys-2.0.dll" \
+           "${TESTSUITE_BUILDDIR}/testinst/bin/msys-2.0.dll"
+        "${BUILDDIR}/cygserver/cygserver" &
+        cd "${TESTSUITE_BUILDDIR}"
+        LC_ALL=C make check AM_CFLAGS="-std=gnu89 -w" CFLAGS="-O2 -pipe -ggdb -std=gnu89 -w"
+ 
 
-    # build
-    - name: Build Cygwin
-      run: >-
-        export PATH=/usr/bin:$(cygpath ${SYSTEMROOT})/system32 &&
-        mkdir build install &&
-        (cd winsup; ./autogen.sh) &&
-        cd build &&
-        ../configure --prefix=$(realpath $(pwd)/../install) -v &&
-        export MAKEFLAGS=-j$(nproc) &&
-        make &&
-        make install &&
-        (cd */newlib; make info man) &&
-        (cd */newlib; make install-info install-man)
-      shell: C:\cygwin\bin\bash.exe --noprofile --norc -eo pipefail '{0}'
-
-    # test
-    - name: Test Cygwin
-      run: >-
-        export PATH=/usr/bin:$(cygpath ${SYSTEMROOT})/system32 &&
-        export MAKEFLAGS=-j$(nproc) &&
-        cd build &&
-        (export PATH=${{ matrix.target }}/winsup/testsuite/testinst/bin:${PATH} && cmd /c $(cygpath -wa ${{ matrix.target }}/winsup/cygserver/cygserver) &) &&
-        (cd ${{ matrix.target }}/winsup; make check AM_COLOR_TESTS=always)
-      shell: C:\cygwin\bin\bash.exe --noprofile --norc -eo pipefail '{0}'
-
+    - name: Upload install
+      uses: actions/upload-artifact@v4
+      with:
+        name: install
+        path: _dest/
     # upload test logs to facilitate investigation of problems
     - name: Upload test logs
       uses: actions/upload-artifact@v4
@@ -175,7 +183,3 @@ jobs:
           build/${{ matrix.target }}/winsup/testsuite/**/*.log
           build/${{ matrix.target }}/winsup/testsuite/**/*.trs
       if: ${{ !cancelled() }}
-
-    # workaround problems with actions/checkout post-run step using cygwin git
-    - name: Avoid actions/checkout post-run step using Cygwin git
-      run: bash -c 'rm /usr/bin/git.exe'
