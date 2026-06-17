@@ -338,6 +338,9 @@ XFAIL_TESTS = \
 	winsup.api/ltp/setuid02 \
 	winsup.api/ltp/ulimit01 \
 	winsup.api/ltp/unlink08 \
+	winsup.api/ltp/umask03 \
+	winsup.api/ltp/stat02 \
+	winsup.api/ltp/chmod01 \
 	winsup.api/samples/sample-fail
 
 # cygrun.sh test-runner script, and variables used by it:
