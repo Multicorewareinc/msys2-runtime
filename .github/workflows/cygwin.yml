@@ -116,6 +116,7 @@ jobs:
           msys2-devel
           base-devel
           autotools
+          busybox
           cocom
           dejagnu
           gcc
