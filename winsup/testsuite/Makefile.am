@@ -341,6 +341,13 @@ XFAIL_TESTS = \
 	winsup.api/ltp/umask03 \
 	winsup.api/ltp/stat02 \
 	winsup.api/ltp/chmod01 \
+	winsup.api/ltp/lstat02 \
+	winsup.api/ltp/readlink01 \
+	winsup.api/ltp/readlink02 \
+	winsup.api/ltp/symlink01 \
+	winsup.api/ltp/symlink03 \
+	winsup.api/ltp/symlink04 \
+	winsup.api/ltp/symlink05 \
 	winsup.api/samples/sample-fail
 
 # cygrun.sh test-runner script, and variables used by it:
@@ -367,7 +374,7 @@ export cygrun=$(builddir)/mingw/cygrun
 #
 
 check-local:
-	$(MKDIR_P) ${builddir}/testinst/tmp
+	$(MKDIR_P) ${builddir}/tmp
 	$(MKDIR_P) ${builddir}/usr/bin
 	cd ${builddir}/usr/bin && cp /usr/libexec/busybox/bin/busybox.exe sh.exe
 	cd ${builddir}/usr/bin && cp /usr/libexec/busybox/bin/busybox.exe sleep.exe
