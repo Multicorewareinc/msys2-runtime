@@ -166,7 +166,7 @@ jobs:
            "${TESTSUITE_BUILDDIR}/testinst/bin/msys-2.0.dll"
         "${BUILDDIR}/cygserver/cygserver" &
         cd "${TESTSUITE_BUILDDIR}"
-        LC_ALL=C make check AM_CFLAGS="-std=gnu89 -w" CFLAGS="-O2 -pipe -ggdb -std=gnu89 -w"
+        LC_ALL=C make check AM_CFLAGS="-std=gnu89 -w" CFLAGS="-O2 -pipe -ggdb -std=gnu89 -w" AM_COLOR_TESTS=always
  
 
     - name: Upload install
