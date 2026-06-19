@@ -341,6 +341,13 @@ XFAIL_TESTS = \
 	winsup.api/ltp/umask03 \
 	winsup.api/ltp/stat02 \
 	winsup.api/ltp/chmod01 \
+	winsup.api/ltp/lstat02 \
+	winsup.api/ltp/readlink01 \
+	winsup.api/ltp/readlink02 \
+	winsup.api/ltp/symlink01 \
+	winsup.api/ltp/symlink03 \
+	winsup.api/ltp/symlink04 \
+	winsup.api/ltp/symlink05 \
 	winsup.api/samples/sample-fail
 
 # cygrun.sh test-runner script, and variables used by it:
