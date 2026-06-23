@@ -167,7 +167,6 @@ jobs:
         cp "${CYGWIN_BUILDDIR}/new-msys-2.0.dll" \
           "${TESTSUITE_BUILDDIR}/testinst/bin/msys-2.0.dll"
 
-        PATH="${TESTSUITE_BUILDDIR}/testinst/bin:${PATH}"
 
         CYGSERVER=$(cygpath -wa "${BUILDDIR}/cygserver/cygserver.exe")
         "$CYGSERVER" &
