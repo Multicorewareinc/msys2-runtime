@@ -165,6 +165,11 @@ jobs:
         cp "${CYGWIN_BUILDDIR}/new-msys-2.0.dll" \
            "${TESTSUITE_BUILDDIR}/testinst/bin/msys-2.0.dll"
         "${BUILDDIR}/cygserver/cygserver" &
+        cp "${TESTSUITE_BUILDDIR}/testinst/bin/msys-2.0.dll" \
+              "${BUILDDIR}/cygserver/msys-2.0.dll" 
+        CYGSERVER=$(cygpath -wa "${BUILDDIR}/cygserver/cygserver.exe")
+        "$CYGSERVER" &
+        CYGSERVER_PID=$!
         cd "${TESTSUITE_BUILDDIR}"
         LC_ALL=C make check AM_CFLAGS="-std=gnu89 -w" CFLAGS="-O2 -pipe -ggdb -std=gnu89 -w" AM_COLOR_TESTS=always
  
