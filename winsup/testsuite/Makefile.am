@@ -376,9 +376,9 @@ export cygrun=$(builddir)/mingw/cygrun
 check-local:
 	$(MKDIR_P) ${builddir}/tmp
 	$(MKDIR_P) ${builddir}/usr/bin
-	cd ${builddir}/usr/bin && cp /usr/libexec/busybox/bin/busybox.exe sh.exe
-	cd ${builddir}/usr/bin && cp /usr/libexec/busybox/bin/busybox.exe sleep.exe
-	cd ${builddir}/usr/bin && cp /usr/libexec/busybox/bin/busybox.exe ls.exe
+	cd ${builddir}/usr/bin && cp /usr/bin/busybox.exe sh.exe
+	cd ${builddir}/usr/bin && cp /usr/bin/busybox.exe sleep.exe
+	cd ${builddir}/usr/bin && cp /usr/bin/busybox.exe ls.exe
 
 # target to build all the programs needed by check, without running check
 check_programs: $(check_PROGRAMS)
