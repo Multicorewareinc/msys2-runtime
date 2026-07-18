@@ -3201,7 +3201,6 @@ class fhandler_process_fd : public fhandler_process
 
 class fhandler_procnet: public fhandler_proc
 {
-  pid_t pid;
  public:
   fhandler_procnet ();
   fhandler_procnet (void *) {}
