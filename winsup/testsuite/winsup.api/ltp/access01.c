@@ -182,8 +182,20 @@ int main(int ac, char **av)
 	Tst_count=0;
 
 	for (tc=0; tc<Ntc; tc++) {
-	    /* 
-	     * Call access(2) 
+	    /*
+	     * On Cygwin/MSYS2 execute permission is not the POSIX 'x' bit:
+	     * it is derived from the file's extension (.exe/.bat/...) or a
+	     * '#!' shebang, so a plain file is never X_OK regardless of its
+	     * mode bits.  Skip the X_OK subtest as not applicable here.
+	     */
+	    if (Test_cases[tc].mode == X_OK) {
+		tst_resm(TCONF, "access(%s, X_OK): execute permission is not the "
+			 "POSIX x bit on Cygwin/MSYS2, skipping",
+			 Test_cases[tc].file);
+		continue;
+	    }
+	    /*
+	     * Call access(2)
 	     */
 	    TEST(access(Test_cases[tc].file, Test_cases[tc].mode));
 	
