@@ -130,6 +130,16 @@ AC_ARG_ENABLE(utils,
 	      [AS_HELP_STRING([--disable-utils], [do not build utils])],,
 	      enable_utils=yes)
 AM_CONDITIONAL(BUILD_UTILS, [test $enable_utils != "no"])
+# --enable-mingw-utils: opt-in to build only the MinGW *host* tools in
+# utils/mingw (e.g. cygwin-console-helper) without the cygwin-linked utils in
+# utils/ (which stay behind --disable-utils).  Used by the ARM64 cross build to
+# ship individual MinGW utilities the same way the native x86_64 build does
+# (via `make`, not a hand-written compile line), while the ~26 cygwin-linked
+# utils remain deferred.  Default off => a no-op for every existing config.
+AC_ARG_ENABLE(mingw-utils,
+	      [AS_HELP_STRING([--enable-mingw-utils], [build the MinGW host tools in utils/mingw (e.g. cygwin-console-helper) without the cygwin-linked utils])],,
+	      enable_mingw_utils=no)
+AM_CONDITIONAL(BUILD_MINGW_UTILS, [test "x$enable_mingw_utils" = "xyes"])
 
 AC_CHECK_PROGS([DOCBOOK2XTEXI], [docbook2x-texi db2x_docbook2texi])
 if test -z "$DOCBOOK2XTEXI" ; then
@@ -150,8 +160,8 @@ if test -z "$XMLTO"; then
     fi
 fi
 
-if test "x$with_mingw_progs" != "xno" || test "x$enable_mingw_utils" = "xyes"; then
-    AC_CHECK_PROGS(MINGW_CXX, ${build_cpu}-w64-mingw32-g++)
+if test "x$with_cross_bootstrap" != "xyes" || test "x$enable_mingw_utils" = "xyes"; then
+    AC_CHECK_PROGS(MINGW_CXX, ${target_cpu}-w64-mingw32-g++)
     test -n "$MINGW_CXX" || AC_MSG_ERROR([no acceptable MinGW g++ found in \$PATH])
     AC_CHECK_PROGS(MINGW_CC, ${build_cpu}-w64-mingw32-gcc)
     test -n "$MINGW_CC" || AC_MSG_ERROR([no acceptable MinGW gcc found in \$PATH])
@@ -167,18 +177,10 @@ if test "x$with_mingw_progs" != "xno" || test "x$enable_mingw_utils" = "xyes"; t
 	test -n "$MINGW32_CC" || AC_MSG_ERROR([no acceptable mingw32 gcc found in \$PATH])
 	test -n "$MINGW64_CC" || AC_MSG_ERROR([no acceptable mingw64 gcc found in \$PATH])
     fi
-
-    # The ARM64 (aarch64) MinGW compiler is optional: it is only present on
-    # Windows-on-ARM build hosts.  When available we build the matching
-    # getprocaddrarm64 helper so that gentle console-Ctrl kill of native ARM64
-    # (PID_NOTCYGWIN) processes works (see cygwin/include/cygwin/exit_process.h).
-    # Do *not* error out when it is missing, so x86 build hosts are unaffected.
-    AC_CHECK_PROGS(MINGWARM64_CC, aarch64-w64-mingw32-gcc)
 fi
 AM_CONDITIONAL(CROSS_BOOTSTRAP, [test "x$with_cross_bootstrap" != "xyes"])
 AM_CONDITIONAL(HAVE_MINGW32_CC, [test -n "$MINGW32_CC"])
 AM_CONDITIONAL(HAVE_MINGW64_CC, [test -n "$MINGW64_CC"])
-AM_CONDITIONAL(HAVE_MINGWARM64_CC, [test -n "$MINGWARM64_CC"])
 
 # Optional aarch64 MinGW compiler (present only on Windows-on-ARM hosts).
 # When available, build getprocaddrarm64 for gentle kill of native ARM64
