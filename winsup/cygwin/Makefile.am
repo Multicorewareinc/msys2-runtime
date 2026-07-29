@@ -649,8 +649,8 @@ else
 	$(newlib_build)/libc.a \
 	-lgcc -lkernel32 -lntdll -Wl,-Map,msys.map
 endif
-	@$(MKDIR_P) ${target_builddir}/winsup/testsuite/testinst/bin/
-	$(AM_V_at)$(INSTALL_PROGRAM) $(NEW_DLL_NAME) ${target_builddir}/winsup/testsuite/testinst/bin/$(DLL_NAME)
+	@$(MKDIR_P) ${target_builddir}/winsup/testsuite/testinst/usr/bin/
+	$(AM_V_at)$(INSTALL_PROGRAM) $(NEW_DLL_NAME) ${target_builddir}/winsup/testsuite/testinst/usr/bin/$(DLL_NAME)
 
 # msys-2.0 import library
 toolopts=--cpu=@target_cpu@ --ar=@AR@ --as=@AS@ --nm=@NM@ --objcopy=@OBJCOPY@
