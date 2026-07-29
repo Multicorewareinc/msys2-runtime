@@ -139,8 +139,10 @@ printf("search_path: cmd = %s, access_mode = %d, fullpath = %d\n", cmd, access_m
 			PATH_MAX);
 		    return -1;
 		}
-		/* Don't emit "//cmd" when cwd is "/": a leading "//" is a UNC
-		   path on Cygwin/MSYS2.  */
+		/* Avoid a leading "//": on Cygwin/MSYS2 a path starting with
+		   "//" denotes a UNC network path.  When cwd is the root "/"
+		   (as in the MSYS2 testsuite install-root) "%s/%s" would yield
+		   "//cmd"; collapse curpath to "" so we emit "/cmd" instead. */
 		sprintf(res_path, "%s/%s", strcmp(curpath, "/") ? curpath : "", cmd);
 	    }
 	    else
@@ -204,7 +206,7 @@ printf("search_path: tmppath = %s\n", tmppath);
 	    continue;
 	}
 
-	/* Same "//" guard as above.  */
+	/* Same UNC-path guard as above for the PATH-scan branch. */
 	sprintf(res_path, "%s/%s", strcmp(tmppath, "/") ? tmppath : "", cmd);
 #if DEBUG
 printf("search_path: res_path = '%s'\n", res_path);
