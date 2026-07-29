@@ -162,9 +162,9 @@ jobs:
         BUILDDIR=$(realpath build/${{ matrix.target }}/winsup)
         TESTSUITE_BUILDDIR="${BUILDDIR}/testsuite"
         CYGWIN_BUILDDIR="${BUILDDIR}/cygwin"
-        mkdir -p "${TESTSUITE_BUILDDIR}/testinst/bin"
+        mkdir -p "${TESTSUITE_BUILDDIR}/testinst/usr/bin"
         cp "${CYGWIN_BUILDDIR}/new-msys-2.0.dll" \
-           "${TESTSUITE_BUILDDIR}/testinst/bin/msys-2.0.dll"
+           "${TESTSUITE_BUILDDIR}/testinst/usr/bin/msys-2.0.dll"
         "${BUILDDIR}/cygserver/cygserver" &
         cd "${TESTSUITE_BUILDDIR}"
         LC_ALL=C make check AM_CFLAGS="-std=gnu89 -w" CFLAGS="-O2 -pipe -ggdb -std=gnu89 -w"
