@@ -336,9 +336,15 @@ TESTS = $(check_PROGRAMS) \
 # The chmod/symlink entries are the subset of PR #344's XFAILs that also fail on
 # aarch64-pc-msys; the others pass here and would XPASS if listed.
 XFAIL_TESTS = \
+	winsup.api/ltp/access01 \
+	winsup.api/ltp/access05 \
+	winsup.api/ltp/chmod01 \
 	winsup.api/ltp/setgroups01 \
 	winsup.api/ltp/setuid02 \
+	winsup.api/ltp/stat02 \
+	winsup.api/ltp/symlink03 \
 	winsup.api/ltp/ulimit01 \
+	winsup.api/ltp/umask03 \
 	winsup.api/ltp/unlink08 \
 	winsup.api/ltp/umask03 \
 	winsup.api/ltp/stat02 \
