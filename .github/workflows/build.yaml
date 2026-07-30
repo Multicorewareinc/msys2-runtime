@@ -136,6 +136,11 @@ jobs:
           export MAKEFLAGS=-j8
           export MSYS=winsymlinks:nativestrict
           WINSUP=$PWD/x86_64-pc-cygwin/winsup
+          TESTINST_WIN=$(cygpath -m "$WINSUP/testsuite/testinst")
+          mkdir -p $WINSUP/testsuite/testinst/etc
+          printf '%s/tmp /tmp ntfs binary,acl 0 0\n' "$TESTINST_WIN" > $WINSUP/testsuite/testinst/etc/fstab
+          printf 'none /cygdrive cygdrive binary,posix=0,acl 0 0\n' >> $WINSUP/testsuite/testinst/etc/fstab
+          echo "--- testinst/etc/fstab ---"; cat $WINSUP/testsuite/testinst/etc/fstab
           cp $WINSUP/cygserver/cygserver.exe $WINSUP/testsuite/testinst/usr/bin/
           ( cd $WINSUP/testsuite/testinst/usr/bin && PATH=$PWD:$WINDIR/system32 "$WINDIR/System32/WindowsPowerShell/v1.0/powershell.exe" -command '& .\cygserver.exe' & )
           # cygserver is launched asynchronously; wait for it to come up before
