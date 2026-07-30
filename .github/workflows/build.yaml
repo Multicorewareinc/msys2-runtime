@@ -139,7 +139,7 @@ jobs:
           cp $WINSUP/cygserver/cygserver.exe $WINSUP/testsuite/testinst/usr/bin/ &&
           (cd $WINSUP/testsuite/testinst/usr/bin &&
            PATH=$PWD:$WINDIR/system32
-           pwsh -command '& .\cygserver.exe' &) &&
+           "$WINDIR/System32/WindowsPowerShell/v1.0/powershell.exe" -command '& .\cygserver.exe' &) &&
           (cd $WINSUP && make check AM_COLOR_TESTS=always)
 
       - name: Upload testsuite logs
