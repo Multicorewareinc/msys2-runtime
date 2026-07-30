@@ -11,7 +11,12 @@ export PATH="$runtime_root:${PATH}"
 if [ "$1" = "./mingw/cygload" ]
 then
     windows_runtime_root=$(cygpath -m $runtime_root)
-    MSYS_NO_PATHCONV=1 $cygrun "$exe -v -cygwin $windows_runtime_root/msys-2.0.dll"
+    # Keep MSYS2 from mangling the drive-qualified DLL path we pass to the
+    # native cygload.  This must be exported: the MSYS2 runtime reads it from
+    # this shell's own environment when converting arguments, so a per-command
+    # "VAR=val cmd" prefix (which only sets it in the child) has no effect.
+    export MSYS2_ARG_CONV_EXCL='*'
+    $cygrun "$exe -v -cygwin $windows_runtime_root/msys-2.0.dll"
 else
     cygdrop $cygrun $exe
 fi
