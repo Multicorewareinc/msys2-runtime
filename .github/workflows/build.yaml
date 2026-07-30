@@ -131,16 +131,22 @@ jobs:
 
       - name: Run the test suite of Cygwin
         shell: msys2 {0}
-        run: >-
-          export PATH=/usr/bin:$WINDIR/system32 &&
-          export MAKEFLAGS=-j8 &&
-          export MSYS=winsymlinks:nativestrict &&
-          WINSUP=$PWD/x86_64-pc-cygwin/winsup &&
-          cp $WINSUP/cygserver/cygserver.exe $WINSUP/testsuite/testinst/usr/bin/ &&
-          (cd $WINSUP/testsuite/testinst/usr/bin &&
-           PATH=$PWD:$WINDIR/system32
-           "$WINDIR/System32/WindowsPowerShell/v1.0/powershell.exe" -command '& .\cygserver.exe' &) &&
-          (cd $WINSUP && make check AM_COLOR_TESTS=always)
+        run: |
+          export PATH=/usr/bin:$WINDIR/system32
+          export MAKEFLAGS=-j8
+          export MSYS=winsymlinks:nativestrict
+          WINSUP=$PWD/x86_64-pc-cygwin/winsup
+          cp $WINSUP/cygserver/cygserver.exe $WINSUP/testsuite/testinst/usr/bin/
+          ( cd $WINSUP/testsuite/testinst/usr/bin && PATH=$PWD:$WINDIR/system32 "$WINDIR/System32/WindowsPowerShell/v1.0/powershell.exe" -command '& .\cygserver.exe' & )
+          # cygserver is launched asynchronously; wait for it to come up before
+          # running the SysV IPC tests (semtest/shmtest/msgtest) that depend on
+          # it, otherwise they race its startup and fail intermittently.
+          for i in $(seq 1 60); do
+            "$WINDIR/System32/tasklist.exe" //FI "IMAGENAME eq cygserver.exe" 2>/dev/null | grep -qi cygserver && break
+            sleep 1
+          done
+          sleep 5
+          cd $WINSUP && make check AM_COLOR_TESTS=always
 
       - name: Upload testsuite logs
         if: always()
