@@ -124,7 +124,6 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           name: wt.tgz
-          path: wt.tgz
 
       - name: Extract worktree
         shell: msys2 {0}
