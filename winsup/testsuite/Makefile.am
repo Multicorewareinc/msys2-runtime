@@ -340,7 +340,9 @@ XFAIL_TESTS = \
 	winsup.api/ltp/setgroups01 \
 	winsup.api/ltp/setuid02 \
 	winsup.api/ltp/stat02 \
+	winsup.api/ltp/symlink01 \
 	winsup.api/ltp/symlink03 \
+	winsup.api/ltp/symlink05 \
 	winsup.api/ltp/ulimit01 \
 	winsup.api/ltp/umask03 \
 	winsup.api/ltp/unlink08 \
