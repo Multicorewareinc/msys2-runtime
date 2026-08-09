@@ -334,8 +334,6 @@ TESTS = $(check_PROGRAMS) \
 
 # expected fail tests
 XFAIL_TESTS = \
-	winsup.api/ltp/access01 \
-	winsup.api/ltp/access05 \
 	winsup.api/ltp/chmod01 \
 	winsup.api/ltp/setgroups01 \
 	winsup.api/ltp/setuid02 \
