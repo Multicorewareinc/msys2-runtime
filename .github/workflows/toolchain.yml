@@ -46,8 +46,8 @@ jobs:
   # The inter-phase caches used to be keyed by github.run_id (unique per dispatch),
   # so every re-dispatch was a full miss and rebuilt the ~6h toolchain from scratch.
   # Instead, hash ONLY the inputs that affect steps 1-13: the 12 toolchain package
-  # dirs in MSYS2-packages, the build-driver scripts (.github/arm64 here), and the
-  # msys2-woarm64-build driver tip. The runtime PKGBUILDs (built in steps 14-16,
+  # dirs in MSYS2-packages and the build-driver scripts (.github/arm64 here,
+  # including the vendored pthread hacks). The runtime PKGBUILDs (built in steps 14-16,
   # never cached) are deliberately EXCLUDED so editing them does not invalidate the
   # toolchain cache. Same hash H => re-dispatch restores 1-13 and fast-installs them
   # (pacman -U, minutes); a toolchain change flips H and triggers a correct rebuild.
@@ -64,13 +64,6 @@ jobs:
           repository: qcom-eng-691/MSYS2-packages
           ref: ${{ github.event.inputs.pkgs_branch || 'ci/cross-runtime-packaging' }}
           path: _pkgs
-          token: ${{ secrets.CI_TOKEN || github.token }}
-      - name: Checkout msys2-woarm64-build (toolchain build driver)
-        uses: actions/checkout@v4
-        with:
-          repository: qcom-eng-691/msys2-woarm64-build
-          ref: native-mingw-toolchain-2
-          path: _driver
           token: ${{ secrets.CI_TOKEN || github.token }}
       - name: Compute content-addressed toolchain key
         id: h
@@ -107,10 +100,8 @@ jobs:
               # per-dir tree SHA: changes iff anything under that PKGBUILD dir changes
               git -C _pkgs rev-parse "HEAD:$d"
             done
-            # build-driver scripts in THIS repo (step logic, pthread hacks invoked here)
+            # build-driver scripts in THIS repo (step logic + vendored pthread hacks)
             git rev-parse "HEAD:.github/arm64"
-            # external driver repo tip (msys2-woarm64-build @ native-mingw-toolchain-2)
-            git -C _driver rev-parse HEAD
           } > /tmp/tc-inputs.txt
           echo "----- toolchain cache inputs -----"
           cat /tmp/tc-inputs.txt
@@ -127,8 +118,6 @@ jobs:
       ROOT: /c/msys2-arm64-build
       PKGS_REPO: https://github.com/qcom-eng-691/MSYS2-packages.git
       PKGS_BRANCH: ${{ github.event.inputs.pkgs_branch || 'ci/cross-runtime-packaging' }}
-      DRIVER_REPO: https://github.com/qcom-eng-691/msys2-woarm64-build.git
-      DRIVER_BRANCH: native-mingw-toolchain-2
       # Never block on a git credential prompt (private org clones) — fail fast.
       GIT_TERMINAL_PROMPT: "0"
     steps:
@@ -170,8 +159,8 @@ jobs:
         shell: msys2 {0}
         env:
           LOGDIR: ${{ github.workspace }}/woarm64-logs
-          # PAT with org read access for the private MSYS2-packages /
-          # msys2-woarm64-build clones; falls back to the (repo-scoped) job token.
+          # PAT with org read access for the private MSYS2-packages clone;
+          # falls back to the (repo-scoped) job token.
           GH_TOKEN: ${{ secrets.CI_TOKEN || github.token }}
           STOP_AFTER: "9"   # stop after the mingw chain; arm64-msys does the rest
         run: |
@@ -207,8 +196,6 @@ jobs:
       ROOT: /c/msys2-arm64-build
       PKGS_REPO: https://github.com/qcom-eng-691/MSYS2-packages.git
       PKGS_BRANCH: ${{ github.event.inputs.pkgs_branch || 'ci/cross-runtime-packaging' }}
-      DRIVER_REPO: https://github.com/qcom-eng-691/msys2-woarm64-build.git
-      DRIVER_BRANCH: native-mingw-toolchain-2
       # Never block on a git credential prompt (private org clones) — fail fast.
       GIT_TERMINAL_PROMPT: "0"
     steps:
@@ -293,8 +280,6 @@ jobs:
       ROOT: /c/msys2-arm64-build
       PKGS_REPO: https://github.com/qcom-eng-691/MSYS2-packages.git
       PKGS_BRANCH: ${{ github.event.inputs.pkgs_branch || 'ci/cross-runtime-packaging' }}
-      DRIVER_REPO: https://github.com/qcom-eng-691/msys2-woarm64-build.git
-      DRIVER_BRANCH: native-mingw-toolchain-2
       # Never block on a git credential prompt (private org clones) — fail fast.
       GIT_TERMINAL_PROMPT: "0"
     steps:

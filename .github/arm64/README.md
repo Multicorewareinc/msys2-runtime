@@ -17,12 +17,14 @@ This repo drives both halves of the ARM64 pipeline:
 These external dependencies are intentionally left pointing at their current
 sources; provision them in this repo's settings first:
 
-1. **`CI_TOKEN` secret** — a PAT with read access to the private sources the
+1. **`CI_TOKEN` secret** — a PAT with read access to the PKGBUILD source the
    toolchain build clones:
    - `qcom-eng-691/MSYS2-packages` (PKGBUILDs, branch `ci/cross-runtime-packaging`)
-   - `qcom-eng-691/msys2-woarm64-build` (build driver, branch `native-mingw-toolchain-2`)
-   Without it the private clones fail. The release download itself uses the job
-   token (same repo), so `CI_TOKEN` is only needed for the cross-repo clones.
+   Without it the private clone fails. The release download itself uses the job
+   token (same repo), so `CI_TOKEN` is only needed for that clone. The old
+   `msys2-woarm64-build` driver is no longer cloned — the only pieces the build
+   used from it (the pthread-header hack scripts) are vendored under
+   `.github/arm64/scripts/`.
 2. **`qcom-eng-691/setup-msys2`** action — the org fork used by every job. Ensure
    this repo can resolve it (make it accessible, or vendor/replace the reference).
 3. **Runner** — jobs target `windows-11-arm` (GitHub-hosted ARM64). Confirm the
