@@ -139,7 +139,9 @@ printf("search_path: cmd = %s, access_mode = %d, fullpath = %d\n", cmd, access_m
 			PATH_MAX);
 		    return -1;
 		}
-		sprintf(res_path, "%s/%s", curpath, cmd);
+		/* Don't emit "//cmd" when cwd is "/": a leading "//" is a UNC
+		   path on Cygwin/MSYS2.  */
+		sprintf(res_path, "%s/%s", strcmp(curpath, "/") ? curpath : "", cmd);
 	    }
 	    else
 	        strcpy(res_path, cmd);
@@ -202,7 +204,8 @@ printf("search_path: tmppath = %s\n", tmppath);
 	    continue;
 	}
 
-	sprintf(res_path, "%s/%s", tmppath, cmd);
+	/* Same "//" guard as above.  */
+	sprintf(res_path, "%s/%s", strcmp(tmppath, "/") ? tmppath : "", cmd);
 #if DEBUG
 printf("search_path: res_path = '%s'\n", res_path);
 #endif

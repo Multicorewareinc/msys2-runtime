@@ -160,8 +160,14 @@ if test "x$with_mingw_progs" != "xno"; then
     test -n "$MINGW32_CC" || AC_MSG_ERROR([no acceptable mingw32 gcc found in \$PATH])
     AC_CHECK_PROGS(MINGW64_CC, x86_64-w64-mingw32-gcc)
     test -n "$MINGW64_CC" || AC_MSG_ERROR([no acceptable mingw64 gcc found in \$PATH])
+
+    # Optional aarch64 MinGW compiler (present only on Windows-on-ARM hosts).
+    # When available, build getprocaddrarm64 for gentle kill of native ARM64
+    # processes; don't error out when missing so x86 hosts are unaffected.
+    AC_CHECK_PROGS(MINGWARM64_CC, aarch64-w64-mingw32-gcc)
 fi
 AM_CONDITIONAL(CROSS_BOOTSTRAP, [test "x$with_cross_bootstrap" != "xyes"])
+AM_CONDITIONAL(HAVE_MINGWARM64_CC, [test -n "$MINGWARM64_CC"])
 
 AC_EXEEXT
 
