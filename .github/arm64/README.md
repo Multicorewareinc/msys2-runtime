@@ -30,10 +30,9 @@ Actions):
    `arm64_runner` workflow_dispatch input with a self-hosted label.
 
 Notes:
-- `toolchain.yml` and `cygwin.yml` use the public **`msys2/setup-msys2@v2`**
-  action (the old `qcom-eng-691` fork existed only for an internal enterprise
-  policy that does not apply here). `build.yaml` (the x86_64 path) still
-  references the `qcom-eng-691` forks and can be repointed the same way when needed.
+- All workflows use the public upstream actions (`msys2/setup-msys2`,
+  `msys2/msys2-tests`, `cygwin/cygwin-install-action`); the old internal forks
+  existed only for an enterprise-actions policy that does not apply on this account.
 - The old `msys2-woarm64-build` driver is no longer cloned — the only pieces the
   build used from it (the pthread-header hack scripts) are vendored under
   `.github/arm64/scripts/`.

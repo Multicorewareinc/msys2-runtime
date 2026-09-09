@@ -129,8 +129,7 @@ jobs:
 
     # install cygwin and build tools
     - name: Install Cygwin
-      # org fork of cygwin/cygwin-install-action (enterprise policy blocks external actions)
-      uses: qcom-eng-691/cygwin-install-action@master
+      uses: cygwin/cygwin-install-action@master
       with:
         platform: ${{ matrix.pkgarch }}
         packages: >-
