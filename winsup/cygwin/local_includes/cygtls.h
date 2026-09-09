@@ -346,7 +346,14 @@ public:
 
 #if defined (__aarch64__)
 #define EXCEPTION_MYFAULT_REF "_ZN9exception7myfaultEP17_EXCEPTION_RECORDPvP8_CONTEXTP25_DISPATCHER_CONTEXT_ARM64"
-#define TRY_HANDLER_DATA (void) &&__l_try;
+#define TRY_HANDLER_DATA \
+  __asm__ goto ("\n" \
+  "  .seh_handler " EXCEPTION_MYFAULT_REF ", @except                \n" \
+  "  .seh_handlerdata                 \n" \
+  "  .long 1                    \n" \
+  "  .rva %l[__l_try],%l[__l_endtry],%l[__l_except],%l[__l_except]  \n" \
+  "  .text                   \n" \
+  : : : : __l_try, __l_endtry, __l_except)
 #else
 #define EXCEPTION_MYFAULT_REF "_ZN9exception7myfaultEP17_EXCEPTION_RECORDPvP8_CONTEXTP19_DISPATCHER_CONTEXT"
 #define TRY_HANDLER_DATA \
