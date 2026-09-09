@@ -16,6 +16,9 @@
 long double
 nextafterl (long double x, long double y)
 {
+#if defined(__aarch64__) && (LDBL_MANT_DIG == DBL_MANT_DIG)
+  return (long double) nexttoward (x, y);
+# else
   union {
       long double ld;
       struct {
@@ -63,6 +66,7 @@ nextafterl (long double x, long double y)
     u.parts.mantissa |=  normal_bit;
 
   return u.ld;
+# endif /* defined(__aarch64__) */
 }
 
 /* nexttowardl is the same function with a different name.  */
