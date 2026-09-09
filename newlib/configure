@@ -6198,7 +6198,7 @@ else
 fi
 
 
- case $host in
+ case $target in
   aarch64-*-mingw* | aarch64-*-cygwin*)
     IS_AARCH64_WINDOWS=yes ;;
   *)
