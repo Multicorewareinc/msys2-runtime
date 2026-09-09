@@ -14,7 +14,8 @@ jobs:
         uses: actions/checkout@v7
 
       - name: setup-msys2
-        uses: msys2/setup-msys2@v2
+        # org fork of msys2/setup-msys2 (enterprise policy blocks external actions)
+        uses: qcom-eng-691/setup-msys2@v2
         with:
           msystem: MSYS
           update: true
@@ -24,7 +25,18 @@ jobs:
         shell: msys2 {0}
         run: |
           (cd winsup && ./autogen.sh)
-          ./configure --disable-dependency-tracking --with-msys2-runtime-commit="$GITHUB_SHA"
+          # Build the MSYS2 runtime as the x86_64-pc-msys triple, NOT
+          # x86_64-pc-cygwin. This fork renamed the upstream `*-*-cygwin*` cases
+          # to `*-*-msys*` in both the top-level configure (which adds
+          # target-winsup/target-newlib to target_configdirs) and
+          # newlib/configure.host (posix_dir, xdr_dir, _MB_CAPABLE). Configuring
+          # as -cygwin matches neither, so the build produces no runtime.
+          # --disable-utils: skip cygcheck/strace (mingw-built, trip -Werror on
+          # upstream warnings); only msys-2.0.dll is needed for the test artifact.
+          ./configure --disable-dependency-tracking --with-msys2-runtime-commit="$GITHUB_SHA" \
+            --build=x86_64-pc-msys --host=x86_64-pc-msys \
+            --disable-utils \
+            CFLAGS_FOR_TARGET="-g -O2 -D_MB_CAPABLE=1"
           make -j8
 
       - name: Install
@@ -44,7 +56,8 @@ jobs:
       matrix: ${{ steps.matrix.outputs.matrix }}
     steps:
       - id: matrix
-        uses: msys2/msys2-tests/gha-matrix-gen@main
+        # org fork of msys2/msys2-tests (enterprise policy blocks external actions)
+        uses: qcom-eng-691/msys2-tests/gha-matrix-gen@main
 
   msys2-tests:
     needs: [build, generate-msys2-tests-matrix]
@@ -61,7 +74,8 @@ jobs:
       FC: ${{ matrix.fc }}
     steps:
       - id: msys2
-        uses: msys2/setup-msys2@v2
+        # org fork of msys2/setup-msys2 (enterprise policy blocks external actions)
+        uses: qcom-eng-691/setup-msys2@v2
         with:
           msystem: ${{ matrix.msystem }}
           update: true
@@ -91,5 +105,5 @@ jobs:
         run: uname -a
 
       - name: Run tests
-        uses: msys2/msys2-tests@main
-
+        # org fork of msys2/msys2-tests (enterprise policy blocks external actions)
+        uses: qcom-eng-691/msys2-tests@main
