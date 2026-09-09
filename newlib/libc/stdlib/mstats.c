@@ -112,7 +112,7 @@ mallopt (int p,
 /* mstats is now compatibility code.  It used to be real, for a
    previous version of the malloc routines.  It now just calls
    malloc_stats.  */
-
+#undef _mstats_r
 void
 _mstats_r (struct _reent *ptr,
 	char *s)
