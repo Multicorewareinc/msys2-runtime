@@ -6,7 +6,7 @@
 
 libm_a_CFLAGS_%C% = -fbuiltin -fno-math-errno
 
-if HAVE_LONG_DOUBLE
+if FALSE
 libm_a_SOURCES += $(%C%_lsrc)
 endif # HAVE_LONG_DOUBLE
 
