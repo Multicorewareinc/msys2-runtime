@@ -1,0 +1,377 @@
+name: Toolchain (ARM64)
+
+# Bootstrap + publish the aarch64-pc-msys cross toolchain. Unlike x64 (whose
+# compiler comes prebuilt from setup-msys2), there is no installable
+# aarch64-pc-msys toolchain, so it is bootstrapped here ONCE and published as a
+# GitHub release (toolchain-arm64-latest) ON THIS REPO. The msys2-runtime CI
+# (cygwin.yml's windows-build-arm64 job) then downloads + installs it and builds
+# the runtime from the commit under test.
+#
+# The full ~7-8h emulated (x86_64-on-ARM64) bootstrap far exceeds GitHub's 6h
+# per-job hard limit, so it is split into THREE chained jobs. Each phase caches
+# its produced *.pkg.tar.zst; the next restores them and fast-installs the
+# already-built steps (have_built -> pacman -U, no rebuild):
+#   arm64-mingw   : steps 1-9   (mingw cross chain)                      ~3h46m
+#   arm64-msys    : steps 10-13 (w32api, runtime-devel, binutils,
+#                                gcc-stage1)                             ~2h35m
+#   arm64-runtime : steps 14-17 (runtime stage1, gcc stage2, runtime
+#                                stage2, verify) + publish release       ~3h30m
+# Steps 14-17 must stay in ONE job: step 15 reads step 14's SRC-tree artifacts
+# (msys2-runtime-aarch64/src/.../libmsys-2.0.a) and step 16 stages crt0.o from
+# its own src tree — those are pruned from the inter-phase package cache.
+#
+# Manual / nightly only (NEVER per-PR): it is a multi-hour build. Dispatch via
+# Actions -> "Toolchain (ARM64)" -> Run workflow. See README.md.
+
+on:
+  workflow_dispatch:
+    inputs:
+      arm64_runner:
+        description: "Runner label for the aarch64-pc-msys jobs (windows-11-arm hosted, or a self-hosted ARM64 label)"
+        type: string
+        default: windows-11-arm
+      pkgs_branch:
+        description: "MSYS2-packages branch to build (e.g. a PR branch); defaults to the integration branch"
+        type: string
+        default: ci/cross-runtime-packaging
+  schedule:
+    # Nightly refresh of the published ARM64 toolchain (off the :00 mark).
+    - cron: "23 4 * * *"
+
+permissions:
+  contents: read
+
+jobs:
+  # PHASE 0: compute a CONTENT-ADDRESSED cache key for the toolchain (steps 1-13).
+  # The inter-phase caches used to be keyed by github.run_id (unique per dispatch),
+  # so every re-dispatch was a full miss and rebuilt the ~6h toolchain from scratch.
+  # Instead, hash ONLY the inputs that affect steps 1-13: the 12 toolchain package
+  # dirs in MSYS2-packages, the build-driver scripts (.github/arm64 here), and the
+  # msys2-woarm64-build driver tip. The runtime PKGBUILDs (built in steps 14-16,
+  # never cached) are deliberately EXCLUDED so editing them does not invalidate the
+  # toolchain cache. Same hash H => re-dispatch restores 1-13 and fast-installs them
+  # (pacman -U, minutes); a toolchain change flips H and triggers a correct rebuild.
+  compute-key:
+    runs-on: ubuntu-latest
+    outputs:
+      key: ${{ steps.h.outputs.key }}
+    steps:
+      - name: Checkout this repo (build driver scripts)
+        uses: actions/checkout@v4
+      - name: Checkout MSYS2-packages (toolchain PKGBUILDs)
+        uses: actions/checkout@v4
+        with:
+          repository: qcom-eng-691/MSYS2-packages
+          ref: ${{ github.event.inputs.pkgs_branch || 'ci/cross-runtime-packaging' }}
+          path: _pkgs
+          token: ${{ secrets.CI_TOKEN || github.token }}
+      - name: Checkout msys2-woarm64-build (toolchain build driver)
+        uses: actions/checkout@v4
+        with:
+          repository: qcom-eng-691/msys2-woarm64-build
+          ref: native-mingw-toolchain-2
+          path: _driver
+          token: ${{ secrets.CI_TOKEN || github.token }}
+      - name: Compute content-addressed toolchain key
+        id: h
+        run: |
+          set -eo pipefail
+          # Content key must cover EVERY PKGBUILD a later phase builds from the
+          # cached MSYS2-packages tree. The tree is cloned once (arm64-mingw) then
+          # carried via the -p1/-p2 caches; phase 3 (arm64-runtime) builds steps
+          # 14-16 from that CACHED tree WITHOUT re-cloning. So the runtime + stage-2
+          # gcc dirs MUST be in the hash too -- otherwise editing them is masked by
+          # an immutable stale cache (issue #3: a fix to cross-msysarm64-gcc was
+          # served stale because it was excluded here). Hash: the mingw chain, the
+          # cross-msysarm64-* dirs INCLUDING stage-2 gcc, and the runtime dirs.
+          tc_dirs="
+            mingw-w64-cross-mingwarm64-headers
+            mingw-w64-cross-mingwarm64-binutils
+            mingw-w64-cross-mingwarm64-gcc-stage1
+            mingw-w64-cross-mingwarm64-windows-default-manifest
+            mingw-w64-cross-mingwarm64-crt
+            mingw-w64-cross-mingwarm64-winpthreads
+            mingw-w64-cross-mingwarm64-gcc
+            mingw-w64-cross-mingwarm64-zlib
+            cross-msysarm64-w32api-headers
+            cross-msysarm64-w32api-runtime
+            cross-msysarm64-runtime-devel
+            cross-msysarm64-binutils
+            cross-msysarm64-gcc-stage1
+            cross-msysarm64-gcc
+            msys2-runtime-aarch64
+            msys2-runtime-aarch64-stage-2
+          "
+          {
+            for d in $tc_dirs; do
+              # per-dir tree SHA: changes iff anything under that PKGBUILD dir changes
+              git -C _pkgs rev-parse "HEAD:$d"
+            done
+            # build-driver scripts in THIS repo (step logic, pthread hacks invoked here)
+            git rev-parse "HEAD:.github/arm64"
+            # external driver repo tip (msys2-woarm64-build @ native-mingw-toolchain-2)
+            git -C _driver rev-parse HEAD
+          } > /tmp/tc-inputs.txt
+          echo "----- toolchain cache inputs -----"
+          cat /tmp/tc-inputs.txt
+          H=$(sha256sum /tmp/tc-inputs.txt | cut -c1-16)
+          echo "key=arm64-tc-$H" >> "$GITHUB_OUTPUT"
+          echo "computed key: arm64-tc-$H"
+
+  # PHASE 1: the mingw cross chain (steps 1-9).
+  arm64-mingw:
+    needs: compute-key
+    runs-on: ${{ github.event.inputs.arm64_runner || 'windows-11-arm' }}
+    timeout-minutes: 330
+    env:
+      ROOT: /c/msys2-arm64-build
+      PKGS_REPO: https://github.com/qcom-eng-691/MSYS2-packages.git
+      PKGS_BRANCH: ${{ github.event.inputs.pkgs_branch || 'ci/cross-runtime-packaging' }}
+      DRIVER_REPO: https://github.com/qcom-eng-691/msys2-woarm64-build.git
+      DRIVER_BRANCH: native-mingw-toolchain-2
+      # Never block on a git credential prompt (private org clones) — fail fast.
+      GIT_TERMINAL_PROMPT: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup MSYS2 (x86_64, emulated build host)
+        uses: qcom-eng-691/setup-msys2@v2
+        with:
+          msystem: MSYS
+          # Skip the action's internal -Syuu: on the ARM64 runner image the
+          # MSYS2 signing keys are present but "unknown trust", so the action's
+          # update fails. We populate the keyring (establishes trust) then sync
+          # + install ourselves in the next steps.
+          update: false
+      # Two-pass update (what setup-msys2 does internally): pass 1 upgrades the
+      # core (msys2-runtime/pacman/bash) and self-terminates the shell -> the
+      # step "fails", so it is continue-on-error; pass 2 then completes cleanly.
+      - name: Trust keyring + core update (pass 1, self-terminates)
+        shell: msys2 {0}
+        continue-on-error: true
+        run: |
+          pacman-key --init
+          pacman-key --populate msys2
+          pacman -Syuu --noconfirm
+      - name: Update MSYS2 (pass 2)
+        shell: msys2 {0}
+        run: pacman -Syuu --noconfirm
+      - name: Install build prerequisites
+        shell: msys2 {0}
+        run: |
+          # base-devel provides patch/fakeroot/sed/make etc. that makepkg + the
+          # PKGBUILDs need (the PKGBUILDs apply *.patch via `patch`).
+          pacman -S --noconfirm --needed \
+            base-devel patch \
+            git autotools gcc make diffutils perl \
+            gmp-devel mpc-devel isl-devel zlib-devel libzstd-devel \
+            mpfr-devel gettext-devel libiconv-devel gperf lndir \
+            cocom xmlto docbook-xsl
+      - name: Build mingw cross chain (steps 1-9)
+        shell: msys2 {0}
+        env:
+          LOGDIR: ${{ github.workspace }}/woarm64-logs
+          # PAT with org read access for the private MSYS2-packages /
+          # msys2-woarm64-build clones; falls back to the (repo-scoped) job token.
+          GH_TOKEN: ${{ secrets.CI_TOKEN || github.token }}
+          STOP_AFTER: "9"   # stop after the mingw chain; arm64-msys does the rest
+        run: |
+          set -eo pipefail
+          # git is installed by the previous step; authenticate private org clones.
+          git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
+          git config --global --add safe.directory '*'
+          # Run the vendored builder directly (no copy: /usr/local/bin may not exist).
+          bash "$GITHUB_WORKSPACE/.github/arm64/build-msys2-woarm64-all.sh"
+      - name: Prune build trees (keep built packages + PKGBUILDs)
+        shell: msys2 {0}
+        run: |
+          # The cache only needs the produced *.pkg.tar.zst (next phase pacman
+          # -U's them) and the PKGBUILDs. Drop the multi-GB src/ + pkg/ build
+          # trees to keep the cache small.
+          rm -rf "$ROOT"/MSYS2-packages/*/src "$ROOT"/MSYS2-packages/*/pkg || true
+          du -sh "$ROOT"/MSYS2-packages 2>/dev/null || true
+      - name: Cache mingw packages for arm64-msys
+        uses: actions/cache/save@v4
+        with:
+          path: C:\msys2-arm64-build\MSYS2-packages
+          key: ${{ needs.compute-key.outputs.key }}-p1
+
+  # PHASE 2: the msys cross compiler chain (steps 10-13). Restores arm64-mingw's
+  # packages, fast-installs steps 1-9 (have_built -> pacman -U), builds steps
+  # 10-13 (w32api, runtime-devel, binutils, gcc-stage1), then caches everything
+  # produced so far for arm64-runtime.
+  arm64-msys:
+    needs: [compute-key, arm64-mingw]
+    runs-on: ${{ github.event.inputs.arm64_runner || 'windows-11-arm' }}
+    timeout-minutes: 330
+    env:
+      ROOT: /c/msys2-arm64-build
+      PKGS_REPO: https://github.com/qcom-eng-691/MSYS2-packages.git
+      PKGS_BRANCH: ${{ github.event.inputs.pkgs_branch || 'ci/cross-runtime-packaging' }}
+      DRIVER_REPO: https://github.com/qcom-eng-691/msys2-woarm64-build.git
+      DRIVER_BRANCH: native-mingw-toolchain-2
+      # Never block on a git credential prompt (private org clones) — fail fast.
+      GIT_TERMINAL_PROMPT: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore packages from arm64-mingw
+        uses: actions/cache/restore@v4
+        with:
+          path: C:\msys2-arm64-build\MSYS2-packages
+          # On a re-dispatch with an unchanged toolchain, -p2 from a prior run is a
+          # hit (already has 1-13) and we skip rebuilding steps 10-13. On a FIRST run
+          # of a new toolchain hash, -p2 does not exist yet, so we fall back to this
+          # run's freshly-saved -p1 (steps 1-9, guaranteed by the arm64-mingw `needs`
+          # dependency) and build 10-13. Same H, so the fallback is never stale.
+          # NOTE: no `fail-on-cache-miss` here — actions/cache/restore fails on a
+          # PRIMARY-key miss regardless of restore-keys, which would (and did) abort
+          # every first run before the -p1 restore-key could rescue it. The -p1
+          # restore-key is guaranteed within the same run, so a hard guard is both
+          # unnecessary and wrong.
+          key: ${{ needs.compute-key.outputs.key }}-p2
+          restore-keys: |
+            ${{ needs.compute-key.outputs.key }}-p1
+      - name: Setup MSYS2 (x86_64, emulated build host)
+        uses: qcom-eng-691/setup-msys2@v2
+        with:
+          msystem: MSYS
+          update: false        # see arm64-mingw (keyring "unknown trust")
+      - name: Trust keyring + core update (pass 1, self-terminates)
+        shell: msys2 {0}
+        continue-on-error: true
+        run: |
+          pacman-key --init
+          pacman-key --populate msys2
+          pacman -Syuu --noconfirm
+      - name: Update MSYS2 (pass 2)
+        shell: msys2 {0}
+        run: pacman -Syuu --noconfirm
+      - name: Install build prerequisites
+        shell: msys2 {0}
+        run: |
+          pacman -S --noconfirm --needed \
+            base-devel patch \
+            git autotools gcc make diffutils perl \
+            gmp-devel mpc-devel isl-devel zlib-devel libzstd-devel \
+            mpfr-devel gettext-devel libiconv-devel gperf lndir \
+            cocom xmlto docbook-xsl
+      - name: Build msys compiler chain (steps 10-13)
+        shell: msys2 {0}
+        env:
+          LOGDIR: ${{ github.workspace }}/woarm64-logs
+          GH_TOKEN: ${{ secrets.CI_TOKEN || github.token }}
+          STOP_AFTER: "13"   # mingw 1-9 install-prebuilt, build msys 10-13
+        run: |
+          set -eo pipefail
+          git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
+          git config --global --add safe.directory '*'
+          # PKGS restored from arm64-mingw: steps 1-9 are already-built -> fast
+          # pacman -U (installs the mingw cross toolchain), then 10-13 build.
+          bash "$GITHUB_WORKSPACE/.github/arm64/build-msys2-woarm64-all.sh"
+      - name: Prune build trees (keep built packages + PKGBUILDs)
+        shell: msys2 {0}
+        run: |
+          rm -rf "$ROOT"/MSYS2-packages/*/src "$ROOT"/MSYS2-packages/*/pkg || true
+          du -sh "$ROOT"/MSYS2-packages 2>/dev/null || true
+      - name: Cache packages for arm64-runtime
+        uses: actions/cache/save@v4
+        with:
+          path: C:\msys2-arm64-build\MSYS2-packages
+          key: ${{ needs.compute-key.outputs.key }}-p2
+
+  # PHASE 3: runtime + verify + publish (steps 14-17). Restores arm64-msys's
+  # packages, fast-installs steps 1-13, then builds the runtime stage1 -> gcc
+  # stage2 -> runtime stage2 -> verify (all in ONE job: the src-tree artifacts
+  # passed 14->15->16 are not packages and not in the cache). Then publishes the
+  # release ON THIS REPO.
+  arm64-runtime:
+    needs: [compute-key, arm64-msys]
+    runs-on: ${{ github.event.inputs.arm64_runner || 'windows-11-arm' }}
+    timeout-minutes: 350
+    permissions:
+      contents: write        # create/refresh the toolchain release
+    env:
+      ROOT: /c/msys2-arm64-build
+      PKGS_REPO: https://github.com/qcom-eng-691/MSYS2-packages.git
+      PKGS_BRANCH: ${{ github.event.inputs.pkgs_branch || 'ci/cross-runtime-packaging' }}
+      DRIVER_REPO: https://github.com/qcom-eng-691/msys2-woarm64-build.git
+      DRIVER_BRANCH: native-mingw-toolchain-2
+      # Never block on a git credential prompt (private org clones) — fail fast.
+      GIT_TERMINAL_PROMPT: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Restore packages from arm64-msys
+        uses: actions/cache/restore@v4
+        with:
+          path: C:\msys2-arm64-build\MSYS2-packages
+          key: ${{ needs.compute-key.outputs.key }}-p2
+          fail-on-cache-miss: true
+      - name: Setup MSYS2 (x86_64, emulated build host)
+        uses: qcom-eng-691/setup-msys2@v2
+        with:
+          msystem: MSYS
+          update: false        # see arm64-mingw (keyring "unknown trust")
+      - name: Trust keyring + core update (pass 1, self-terminates)
+        shell: msys2 {0}
+        continue-on-error: true
+        run: |
+          pacman-key --init
+          pacman-key --populate msys2
+          pacman -Syuu --noconfirm
+      - name: Update MSYS2 (pass 2)
+        shell: msys2 {0}
+        run: pacman -Syuu --noconfirm
+      - name: Install build prerequisites
+        shell: msys2 {0}
+        run: |
+          pacman -S --noconfirm --needed \
+            base-devel patch \
+            git autotools gcc make diffutils perl \
+            gmp-devel mpc-devel isl-devel zlib-devel libzstd-devel \
+            mpfr-devel gettext-devel libiconv-devel gperf lndir \
+            cocom xmlto docbook-xsl
+      - name: Build runtime + verify (steps 14-17)
+        shell: msys2 {0}
+        env:
+          LOGDIR: ${{ github.workspace }}/woarm64-logs
+          GH_TOKEN: ${{ secrets.CI_TOKEN || github.token }}
+        run: |
+          set -eo pipefail
+          git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
+          git config --global --add safe.directory '*'
+          # PKGS restored from arm64-msys: steps 1-13 are already-built -> fast
+          # pacman -U (installs mingw + msys compiler), then 14-17 build.
+          bash "$GITHUB_WORKSPACE/.github/arm64/build-msys2-woarm64-all.sh"
+      - name: Collect toolchain packages
+        shell: msys2 {0}
+        run: |
+          set -eo pipefail
+          out=/c/pkgs; mkdir -p "$out"
+          # Ship ONLY the cross toolchain packages: cross-msysarm64-* (minus the
+          # stage-1 gcc, superseded by the full gcc — file-conflicts on
+          # aarch64-*-gcc.exe) and mingw-w64-cross-*. The runtime stage-1 build
+          # (step 14, build_msys.sh) ALSO emits non-cross-named msys2-runtime and
+          # msys2-runtime-devel packages under newlib_pkgbuild/pkg/; those must NOT
+          # ship — they file-conflict with cross-msysarm64-runtime-devel on the
+          # sysroot headers AND would DOWNGRADE/clobber the HOST x86_64 msys2-runtime
+          # when the consumer pacman -U's the release. Whitelist the two cross
+          # prefixes instead of blacklisting, so any future stray host-named package
+          # is excluded by default.
+          find "$ROOT/MSYS2-packages" -name '*.pkg.tar.zst' \
+            \( -name 'cross-msysarm64-*' -o -name 'mingw-w64-cross-*' \) \
+            ! -name '*gcc-stage1*' -exec cp -f {} "$out/" \;
+          ls -la "$out"
+      - name: Publish toolchain release
+        # gh is NOT on PATH inside the msys2 shell — use pwsh (gh preinstalled).
+        # Publishes onto THIS repo; github.token suffices. cygwin.yml's
+        # windows-build-arm64 downloads the release from this same repo.
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "toolchain-arm64-latest"
+          gh release delete $tag --yes --cleanup-tag 2>$null
+          $assets = (Get-ChildItem C:\pkgs\*.pkg.tar.zst | ForEach-Object { $_.FullName })
+          if (-not $assets) { Write-Error "no packages collected in C:\pkgs"; exit 1 }
+          gh release create $tag $assets `
+            --title "aarch64-pc-msys toolchain (latest)" `
+            --notes "Cross toolchain packages built by the Toolchain (ARM64) workflow (arm64-mingw -> arm64-msys -> arm64-runtime). Consumed by this repo's cygwin.yml windows-build-arm64 job."

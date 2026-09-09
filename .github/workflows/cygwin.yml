@@ -4,7 +4,7 @@ name: cygwin
 # ARM64 winsup testsuite (windows-build-arm64). The upstream cygwin jobs do not
 # build on this ARM64-port branch's newlib, so they are manual-dispatch only.
 # windows-build-arm64 runs per push/PR: it downloads the prebuilt aarch64-pc-msys
-# toolchain published by the qcom-eng-691/msys2-cross-toolchain repo, builds the
+# toolchain published by this repo's own Toolchain (ARM64) workflow, builds the
 # MSYS2 runtime from the commit under test, and runs `make check` — the ARM64
 # counterpart of windows-build, working toward msys2/msys2-runtime#341.
 
@@ -204,7 +204,7 @@ jobs:
   windows-build-arm64:
     # aarch64-pc-msys: the ARM64 counterpart of windows-build. Installs the
     # prebuilt cross toolchain published as the toolchain-arm64-latest release on
-    # qcom-eng-691/msys2-cross-toolchain, builds the MSYS2 runtime from THIS
+    # THIS repo by the Toolchain (ARM64) workflow, builds the MSYS2 runtime from THIS
     # commit, then runs the winsup testsuite. SKIPS GREEN if the release does not
     # exist yet (run the Toolchain (ARM64) workflow there once to publish it).
     # Non-gating: publishes a baseline; never fails the build on test failures.
@@ -245,21 +245,21 @@ jobs:
 
     - name: Download published toolchain
       # gh is not on PATH in the msys2 shell — download here (pwsh), pacman next.
-      # The release lives on a DIFFERENT repo (msys2-cross-toolchain), so this
-      # needs a token that can read it: CI_TOKEN (PAT with org read). Skip green
-      # if the release is missing so a PR is not blocked before it is published.
+      # The toolchain release is published on THIS repo by toolchain.yml, so the
+      # job token can read it. Skip green if the release is missing so a PR is not
+      # blocked before the Toolchain (ARM64) workflow has published it once.
       id: dl
       shell: pwsh
       env:
         GH_TOKEN: ${{ secrets.CI_TOKEN || github.token }}
       run: |
         New-Item -ItemType Directory -Force C:\pkgs | Out-Null
-        gh release download toolchain-arm64-latest --repo qcom-eng-691/msys2-cross-toolchain --dir C:\pkgs --pattern '*.pkg.tar.zst'
+        gh release download toolchain-arm64-latest --repo ${{ github.repository }} --dir C:\pkgs --pattern '*.pkg.tar.zst'
         if ($LASTEXITCODE -eq 0) {
           "found=true" >> $env:GITHUB_OUTPUT
         } else {
           "found=false" >> $env:GITHUB_OUTPUT
-          "## ARM64 build+test skipped`nNo ``toolchain-arm64-latest`` release on qcom-eng-691/msys2-cross-toolchain yet — run its **Toolchain (ARM64)** workflow once to publish it." >> $env:GITHUB_STEP_SUMMARY
+          "## ARM64 build+test skipped`nNo ``toolchain-arm64-latest`` release on this repo yet — run the **Toolchain (ARM64)** workflow once to publish it." >> $env:GITHUB_STEP_SUMMARY
           Write-Host "::warning::toolchain-arm64-latest release not found; skipping ARM64 build+test until it is published."
         }
         # gh's non-zero exit (release missing) would otherwise become the step's
