@@ -12,15 +12,13 @@ details. */
 #define USE_SYS_TYPES_FD_SET
 #include <winsup.h>
 #include <ws2tcpip.h>
-
-#if defined(__CYGWIN__) && !defined(__aarch64__)
 #include <iphlpapi.h>
 #include <windns.h>
 #include "ntdll.h"
 #undef h_errno
 #include "minires.h"
 
-
+#ifdef __CYGWIN__
 /***********************************************************************
  *
  Windows interface code
@@ -504,8 +502,7 @@ void get_dns_info(res_state statp)
  Default interface code
 
 ***********************************************************************/
-struct __res_state;
-typedef struct __res_state *res_state;
+
 void get_dns_info(res_state statp)
 {
   return;
