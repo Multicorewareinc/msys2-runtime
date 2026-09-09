@@ -166,7 +166,23 @@ main(int ac, char **av)
 				file_name = (char *)get_high_address();
 			}
 
-			/* 
+			/*
+			 * On Windows/NTFS the owner of a file can always read
+			 * it; read access cannot be denied to the owner via
+			 * mode bits.  The "Read Access denied" subtest (chmod
+			 * 0333) therefore cannot return EACCES on Cygwin/MSYS2,
+			 * so skip it as not applicable.  (W_OK and X_OK denial
+			 * are still enforced and remain tested.)
+			 */
+			if (Test_cases[ind].exp_errno == EACCES &&
+			    access_mode == R_OK) {
+				tst_resm(TCONF, "access(R_OK) cannot be denied "
+					 "to the file owner on Cygwin/MSYS2, "
+					 "skipping");
+				continue;
+			}
+
+			/*
 			 * Call access(2) to test different test conditions.
 			 * verify that it fails with -1 return value and
 			 * sets appropriate errno.
