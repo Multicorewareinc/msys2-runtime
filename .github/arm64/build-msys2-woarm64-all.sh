@@ -45,7 +45,9 @@ set -uo pipefail
 #------------------------------- config ---------------------------------------
 ROOT="${ROOT:-/c/msys2-arm64-build}"
 PKGS="$ROOT/MSYS2-packages"
-DRIVER="$ROOT/msys2-woarm64-build"
+# The pthread-header hack scripts (the only files this build needs from the old
+# msys2-woarm64-build driver) are now vendored alongside this script.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOGDIR="${LOGDIR:-$HOME/woarm64-logs}"
 FORCE="${FORCE:-0}"
 NO_CLONE="${NO_CLONE:-0}"
@@ -58,8 +60,6 @@ STOP_AFTER="${STOP_AFTER:-0}"
 
 PKGS_REPO="${PKGS_REPO:-https://github.com/Multicorewareinc/MSYS2-packages.git}"
 PKGS_BRANCH="${PKGS_BRANCH:-woarm64}"
-DRIVER_REPO="${DRIVER_REPO:-https://github.com/Windows-on-ARM-Experiments/msys2-woarm64-build.git}"
-DRIVER_BRANCH="${DRIVER_BRANCH:-native-mingw-toolchain-2}"
 
 MINGW_LIBDIR="/opt/aarch64-w64-mingw32/lib"
 MSYS_SYSROOT="/usr/aarch64-pc-msys"
@@ -211,12 +211,6 @@ if step 1 "preflight"; then
     log "cloning MSYS2-packages ($PKGS_BRANCH)..."
     git clone "$PKGS_REPO" --branch "$PKGS_BRANCH" "$PKGS" || die "clone of MSYS2-packages failed"
   fi
-  if [[ ! -d "$DRIVER" ]]; then
-    [[ "$NO_CLONE" == "1" ]] && die "msys2-woarm64-build missing at $DRIVER and NO_CLONE=1"
-    log "cloning msys2-woarm64-build ($DRIVER_BRANCH)..."
-    git clone "$DRIVER_REPO" "$DRIVER" || die "clone of msys2-woarm64-build failed"
-    ( cd "$DRIVER" && git checkout "$DRIVER_BRANCH" ) || warn "could not checkout $DRIVER_BRANCH (using default)"
-  fi
 
   # cross PKGBUILDs hardcode $HOME/MSYS2-packages -> make it resolve to $PKGS
   HP="$HOME/MSYS2-packages"
@@ -249,8 +243,8 @@ if step 6 "mingw: crt (+pthread hack)"; then
   elif [[ "$FORCE" == "0" ]] && have_built "$D"; then
     log "crt already built -- installing prebuilt"; install_built "$D" || die "crt install failed"; ok "crt installed from prebuilt"
   else
-    BEFORE="$DRIVER/.github/scripts/pthread-headers-hack-before.sh"
-    AFTER="$DRIVER/.github/scripts/pthread-headers-hack-after.sh"
+    BEFORE="$SCRIPT_DIR/scripts/pthread-headers-hack-before.sh"
+    AFTER="$SCRIPT_DIR/scripts/pthread-headers-hack-after.sh"
     [[ -f "$BEFORE" ]] || die "missing $BEFORE"
     "$BEFORE" 2>&1 | tee "$LOGDIR/06-pthread-before.log" || die "pthread before-hack failed"
     [[ -f /opt/aarch64-w64-mingw32/include/pthread_compat.h ]] || die "pthread_compat.h not staged"
