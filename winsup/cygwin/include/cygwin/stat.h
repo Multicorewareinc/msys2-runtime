@@ -9,7 +9,7 @@ details. */
 
 #ifndef _CYGWIN_STAT_H
 #define _CYGWIN_STAT_H
-#include <machine/types.h> 
+
 #ifdef __cplusplus
 extern "C" {
 #endif
