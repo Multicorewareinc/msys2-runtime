@@ -254,6 +254,23 @@ jobs:
           # PKGS restored from arm64-mingw: steps 1-9 are already-built -> fast
           # pacman -U (installs the mingw cross toolchain), then 10-13 build.
           bash "$GITHUB_WORKSPACE/.github/arm64/build-msys2-woarm64-all.sh"
+      - name: Dump per-package build logs on failure
+        if: failure()
+        shell: bash
+        run: |
+          d="${{ github.workspace }}/woarm64-logs"
+          echo "== logs in $d =="; ls -lt "$d" 2>/dev/null || true
+          for f in $(ls -t "$d"/*.log 2>/dev/null | head -3); do
+            echo "===================== tail -200 $f ====================="
+            tail -200 "$f"
+          done
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: woarm64-logs-arm64-msys
+          path: ${{ github.workspace }}/woarm64-logs
+          if-no-files-found: ignore
       - name: Prune build trees (keep built packages + PKGBUILDs)
         shell: msys2 {0}
         run: |
@@ -326,6 +343,23 @@ jobs:
           # PKGS restored from arm64-msys: steps 1-13 are already-built -> fast
           # pacman -U (installs mingw + msys compiler), then 14-17 build.
           bash "$GITHUB_WORKSPACE/.github/arm64/build-msys2-woarm64-all.sh"
+      - name: Dump per-package build logs on failure
+        if: failure()
+        shell: bash
+        run: |
+          d="${{ github.workspace }}/woarm64-logs"
+          echo "== logs in $d =="; ls -lt "$d" 2>/dev/null || true
+          for f in $(ls -t "$d"/*.log 2>/dev/null | head -3); do
+            echo "===================== tail -200 $f ====================="
+            tail -200 "$f"
+          done
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: woarm64-logs-arm64-runtime
+          path: ${{ github.workspace }}/woarm64-logs
+          if-no-files-found: ignore
       - name: Collect toolchain packages
         shell: msys2 {0}
         run: |
