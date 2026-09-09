@@ -4,3 +4,4 @@
 LIBRARY "msys-2.0.dll" BASE=0x180040000
 
 EXPORTS
+_alloca = __alloca NOSIGFE
