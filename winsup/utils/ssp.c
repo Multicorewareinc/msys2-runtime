@@ -41,10 +41,18 @@ static struct option longopts[] =
 
 static char opts[] = "+cdehlstvV";
 
-#ifdef __x86_64__
+#if defined(__x86_64__)
 #define KERNEL_ADDR 0x00007FF000000000
 #define CONTEXT_SP Rsp
 #define CONTEXT_IP Rip
+typedef DWORD64 CONTEXT_REG;
+#define CONTEXT_REG_FMT "%016llx"
+#define ADDR_SSCANF_FMT "%lli"
+#elif defined(__aarch64__)
+// TODO
+#define KERNEL_ADDR 0x00007FF000000000
+#define CONTEXT_SP Sp
+#define CONTEXT_IP Pc
 typedef DWORD64 CONTEXT_REG;
 #define CONTEXT_REG_FMT "%016llx"
 #define ADDR_SSCANF_FMT "%lli"
@@ -200,10 +208,16 @@ set_step_threads (int threadId, int trace)
   if (rv != -1)
     {
       thread_step_flags[tix] = trace;
+#if defined(__i386__) || defined(__x86_64__)
       if (trace)
 	context.EFlags |= 0x100; /* TRAP (single step) flag */
       else
 	context.EFlags &= ~0x100; /* TRAP (single step) flag */
+#elif defined(__aarch64__)
+	// TODO
+#else
+#error unimplemented for this target
+#endif
       SetThreadContext (thread, &context);
     }
 }
@@ -215,7 +229,14 @@ set_steps ()
   for (i=0; i<num_active_threads; i++)
     {
       GetThreadContext (active_threads[i], &context);
+#if defined(__i386__) || defined(__x86_64__)
       s = context.EFlags & 0x0100;
+#elif defined(__aarch64__)
+      // TODO
+      s = 0;
+#else
+#error unimplemented for this target
+#endif
       if (!s && thread_step_flags[i])
 	{
 	  set_step_threads (active_thread_ids[i], 1);
@@ -252,11 +273,13 @@ dump_registers (HANDLE thread)
 {
   context.ContextFlags = CONTEXT_FULL;
   GetThreadContext (thread, &context);
-#ifdef __x86_64__
+#if defined(__x86_64__)
   printf ("eax %016llx ebx %016llx ecx %016llx edx %016llx eip\n",
 	  context.Rax, context.Rbx, context.Rcx, context.Rdx);
   printf ("esi %016llx edi %016llx ebp %016llx esp %016llx %016llx\n",
 	  context.Rsi, context.Rdi, context.Rbp, context.Rsp, context.Rip);
+#elif defined(__aarch64__)
+  // TODO
 #else
 #error unimplemented for this target
 #endif
@@ -542,19 +565,31 @@ run_program (char *cmdline)
 	    {
 	      if (pc == thread_return_address[tix])
 		{
+#if defined(__i386__) || defined(__x86_64__)
 		  if (context.EFlags & 0x100)
 		    {
 		      context.EFlags &= ~0x100; /* TRAP (single step) flag */
 		      SetThreadContext (hThread, &context);
 		    }
+#elif defined(__aarch64__)
+		  // TODO
+#else
+#error unimplemented for this target
+#endif
 		}
 	      else if (stepping_enabled)
 		{
+#if defined(__i386__) || defined(__x86_64__)
 		  if (!(context.EFlags & 0x100))
 		    {
 		      context.EFlags |= 0x100; /* TRAP (single step) flag */
 		      SetThreadContext (hThread, &context);
 		    }
+#elif defined(__aarch64__)
+		  // TODO
+#else
+#error unimplemented for this target
+#endif
 		}
 	    }
 	  break;
@@ -935,7 +970,7 @@ main (int argc, char **argv)
 
   if (dll_counts)
     {
-#ifdef __x86_64__
+#if defined(__x86_64__) || defined(__aarch64__)
       /*       1234567 123% 1234567 123% 1234567812345678 xxxxxxxxxxx */
       printf (" Main-Thread Other-Thread BaseAddr         DLL Name\n");
 #else
