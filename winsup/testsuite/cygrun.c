@@ -75,6 +75,14 @@ main (int argc, char **argv)
 
   CloseHandle (pi.hProcess);
   CloseHandle (pi.hThread);
+  /* An NTSTATUS-range status (e.g. 0xC0000005) is a crash, not an exit code;
+     the "ec >>= 8" below would mask it to a spurious 0.  Fail hard instead.  */
+  if (ec >= 0xc0000000)
+    {
+      fprintf (stderr, "cygrun: %s terminated abnormally (status 0x%08lx)\n",
+	       command, (unsigned long) ec);
+      return 126;
+    }
   if (ec > 0xff)
     ec >>= 8;
   return ec;

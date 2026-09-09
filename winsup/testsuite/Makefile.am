@@ -318,7 +318,7 @@ check_PROGRAMS = \
 # flags for linking against the just built implib
 # TODO: use -nostdinc and to-be-installed headers as well?
 LDFLAGS_FOR_TESTDLL = -nodefaultlibs
-LDADD_FOR_TESTDLL = $(builddir)/../cygwin/libcygwin.a -lgcc -lkernel32 -luser32
+LDADD_FOR_TESTDLL = $(builddir)/../cygwin/libmsys-2.0.a -lgcc -lkernel32 -luser32
 
 # flags for test executables
 AM_CPPFLAGS = -I$(srcdir)/libltp/include
@@ -333,11 +333,18 @@ TESTS = $(check_PROGRAMS) \
 	mingw/cygload
 
 # expected fail tests
+# The chmod/symlink entries are the subset of PR #344's XFAILs that also fail on
+# aarch64-pc-msys; the others pass here and would XPASS if listed.
 XFAIL_TESTS = \
 	winsup.api/ltp/setgroups01 \
 	winsup.api/ltp/setuid02 \
 	winsup.api/ltp/ulimit01 \
 	winsup.api/ltp/unlink08 \
+	winsup.api/ltp/umask03 \
+	winsup.api/ltp/stat02 \
+	winsup.api/ltp/chmod01 \
+	winsup.api/ltp/symlink01 \
+	winsup.api/ltp/symlink03 \
 	winsup.api/samples/sample-fail
 
 # cygrun.sh test-runner script, and variables used by it:
@@ -365,9 +372,10 @@ export cygrun=$(builddir)/mingw/cygrun
 
 check-local:
 	$(MKDIR_P) ${builddir}/testinst/tmp
-	cd ${builddir}/testinst/usr/bin && cp /usr/libexec/busybox/bin/busybox.exe sh.exe
-	cd ${builddir}/testinst/usr/bin && cp /usr/libexec/busybox/bin/busybox.exe sleep.exe
-	cd ${builddir}/testinst/usr/bin && cp /usr/libexec/busybox/bin/busybox.exe ls.exe
+	$(MKDIR_P) ${builddir}/testinst/usr/bin
+	cd ${builddir}/testinst/usr/bin && cp /usr/bin/busybox.exe sh.exe
+	cd ${builddir}/testinst/usr/bin && cp /usr/bin/busybox.exe sleep.exe
+	cd ${builddir}/testinst/usr/bin && cp /usr/bin/busybox.exe ls.exe
 
 # target to build all the programs needed by check, without running check
 check_programs: $(check_PROGRAMS)
