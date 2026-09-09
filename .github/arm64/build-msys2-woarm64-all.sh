@@ -58,8 +58,8 @@ START_STEP="${1:-1}"
 # rest (steps 1-9 fast install-prebuilt from cache, then build 10-17).
 STOP_AFTER="${STOP_AFTER:-0}"
 
-PKGS_REPO="${PKGS_REPO:-https://github.com/Multicorewareinc/MSYS2-packages.git}"
-PKGS_BRANCH="${PKGS_BRANCH:-woarm64}"
+PKGS_REPO="${PKGS_REPO:-https://github.com/mayankag-qti/MSYS2-packages-arm64.git}"
+PKGS_BRANCH="${PKGS_BRANCH:-ci/cross-runtime-packaging}"
 
 MINGW_LIBDIR="/opt/aarch64-w64-mingw32/lib"
 MSYS_SYSROOT="/usr/aarch64-pc-msys"

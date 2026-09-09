@@ -221,8 +221,7 @@ jobs:
         fetch-depth: 0
 
     - name: Setup MSYS2 (x86_64, emulated host)
-      # org fork of msys2/setup-msys2 (enterprise policy blocks external actions)
-      uses: qcom-eng-691/setup-msys2@v2
+      uses: msys2/setup-msys2@v2
       with:
         msystem: MSYS
         update: false        # ARM64 runner image: MSYS2 keys are "unknown trust"
@@ -292,7 +291,7 @@ jobs:
         git config --global url."https://x-access-token:${GH_TOKEN}@github.com/".insteadOf "https://github.com/"
         git config --global --add safe.directory '*'
         mkdir -p "$ROOT"
-        git clone https://github.com/qcom-eng-691/MSYS2-packages.git --branch ci/cross-runtime-packaging "$ROOT/MSYS2-packages"
+        git clone https://github.com/mayankag-qti/MSYS2-packages-arm64.git --branch ci/cross-runtime-packaging "$ROOT/MSYS2-packages"
         HP="$HOME/MSYS2-packages"; rm -rf "$HP"; MSYS=winsymlinks:nativestrict ln -s "$ROOT/MSYS2-packages" "$HP"
         RT2="$ROOT/MSYS2-packages/msys2-runtime-aarch64-stage-2"
         # Build the runtime from the exact commit under test (git+file:// source override).
