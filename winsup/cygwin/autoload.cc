@@ -64,44 +64,34 @@ bool NO_COPY wsock_started;
  *  DLL name (n bytes)	 asciz string containing the name of the DLL.
  */
 
+#if defined(__x86_64__)
+# define WORD64 ".quad"
+#elif defined(__aarch64__)
+# define WORD64 ".xword"
+#else
+# error unimplemented for this target
+#endif
+
 /* LoadDLLprime is used to prime the DLL info information, providing an
    additional initialization routine to call prior to calling the first
-   function.  */
-#if defined(__x86_64__)
-#define LoadDLLprime(dllname, init_also, no_resolve_on_fork) __asm__ ("	\n\
-.ifndef " #dllname "_primed				\n\
-  .section	.data_cygwin_nocopy,\"w\"		\n\
-  .align	8					\n\
-."#dllname "_info:					\n\
-  .quad		_std_dll_init				\n\
-  .quad		" #no_resolve_on_fork "			\n\
-  .long		-1					\n\
-  .align	8					\n\
-  .quad		" #init_also "				\n\
-  .string16	\"" #dllname ".dll\"			\n\
-  .text							\n\
-  .set		" #dllname "_primed, 1			\n\
-.endif							\n\
-");
-#elif defined(__aarch64__)
-#define LoadDLLprime(dllname, init_also, no_resolve_on_fork) __asm__ ( "\n\
+   function. WORD64 stands in for .quad/.xword, and .balign (which means
+   "align to N bytes" on both targets - "x64" and "arm64) is used for
+   alignment.  */
+#define LoadDLLprime(dllname, init_also) __asm__ ("\n\
 .ifndef " #dllname "_primed                              \n\
   .section   .data_cygwin_nocopy,\"w\"                   \n\
-  .balign    8                                          \n\
-." #dllname "_info:                                     \n\
-  .xword     _std_dll_init                               \n\
-  .xword     " #no_resolve_on_fork "                     \n\
-  .long      -1                                         \n\
-  .balign    8                                          \n\
-  .xword     " #init_also "                              \n\
+  .balign    8                                           \n\
+." #dllname "_info:                                      \n\
+  " WORD64 "   _std_dll_init                             \n\
+  " WORD64 "   0                                         \n\
+  .long      -1                                          \n\
+  .balign    8                                           \n\
+  " WORD64 "   " #init_also "                            \n\
   .string16  \"" #dllname ".dll\"                        \n\
-  .text                                                \n\
+  .text                                                  \n\
   .set       " #dllname "_primed, 1                      \n\
-.endif                                                  \n\
+.endif                                                   \n\
 ");
-#else
-#error unimplemented for this target
-#endif
 
 /* Standard DLL load macro.  May invoke a fatal error if the function isn't
    found. */
@@ -110,12 +100,12 @@ bool NO_COPY wsock_started;
 #define LoadDLLfuncEx(name, dllname, notimp) \
   LoadDLLfuncEx2(name, dllname, notimp, 0)
 #define LoadDLLfuncEx2(name, dllname, notimp, err) \
-  LoadDLLfuncEx3(name, dllname, notimp, err, 0)
+  LoadDLLfuncEx3(name, dllname, notimp, err)
 
 /* Main DLL setup stuff. */
 #if defined(__x86_64__)
-#define LoadDLLfuncEx3(name, dllname, notimp, err, no_resolve_on_fork) \
-  LoadDLLprime (dllname, dll_func_load, no_resolve_on_fork) \
+#define LoadDLLfuncEx3(name, dllname, notimp, err) \
+  LoadDLLprime (dllname, dll_func_load) \
   __asm__ ("						\n\
   .section	." #dllname "_autoload_text,\"wx\"	\n\
   .global	" #name "				\n\
@@ -140,8 +130,8 @@ _win32_" #name ":					\n\
   .text							\n\
 ");
 #elif defined(__aarch64__)
-#define LoadDLLfuncEx3(name, dllname, notimp, err, no_resolve_on_fork) \
-  LoadDLLprime (dllname, dll_func_load, no_resolve_on_fork) \
+#define LoadDLLfuncEx3(name, dllname, notimp, err) \
+  LoadDLLprime (dllname, dll_func_load) \
   __asm__ ( "\n\
   .section   ." #dllname "_autoload_text,\"wx\"          \n\
   .global    " #name "                                   \n\
@@ -149,28 +139,28 @@ _win32_" #name ":					\n\
   .p2align   4                                           \n\
 " #name ":                                               \n\
 _win32_" #name ":                                       \n\
-  adr        x16, 3f                                     \n\
-  ldr        x16, [x16]                                  \n\
-  br         x16                                         \n\
+  adr        x16, 3f          // x16 = &func_addr slot (label 3 == func_info+12)\n\
+  ldr        x16, [x16]       // x16 = *(&func_addr) = 1b first time, real addr later\n\
+  br         x16              // fast-path branch into the resolved DLL func\n\
 1:                                                      \n\
-  sub        sp, sp, #80                                 \n\
+  sub        sp, sp, #80      // reserve 80B frame for caller's arg regs + LR\n\
   stp        x0, x1, [sp, #0]                            \n\
   stp        x2, x3, [sp, #16]                           \n\
   stp        x4, x5, [sp, #32]                           \n\
   stp        x6, x7, [sp, #48]                           \n\
-  stp        x8, x30, [sp, #64]                          \n\
-  adr        x16, 2f                                     \n\
-  ldur       x17, [x16]                                  \n\
-  ldr        x17, [x17]                                  \n\
-  blr        x17                                         \n\
+  stp        x8, x30, [sp, #64] // x30 here == label 2 == &func_info\n\
+  adr        x16, 2f          // x16 = &func_info\n\
+  ldr        x17, [x16]       // x17 = func_info->dll (= dll_info*)\n\
+  ldr        x17, [x17]       // x17 = dll_info->load_state (e.g. _std_dll_init)\n\
+  blr        x17              // call thunk; LR = label 2 = arg to std_dll_init\n\
 2:                                                      \n\
-  .xword     ." #dllname "_info                          \n\
-  .hword     " #notimp "                                 \n\
-  .hword     ((" #err ") & 0xffff)                       \n\
-3:                                                      \n\
-  .xword     1b                                          \n\
-  .asciz     \"" #name "\"                               \n\
-  .text                                                \n\
+  .xword     ." #dllname "_info // +0  func_info.dll\n\
+  .hword     " #notimp "         // +8  func_info.decoration[lo]\n\
+  .hword     ((" #err ") & 0xffff) // +10 func_info.decoration[hi]\n\
+3:                                                       \n\
+  .xword     1b                // +12 func_info.func_addr (patched by dll_func_load)\n\
+  .asciz     \"" #name "\"      // +20 func_info.name (asciz)\n\
+  .text                                                  \n\
 ");
 #else
 #error unimplemented for this target
@@ -261,55 +251,55 @@ msg1:                                                    \n\
                                                          \n\
   .text                                                  \n\
   .p2align 2                                             \n\
-noload:                                                  \n\
-  ldr        x2, [sp]            // func_info*           \n\
-  ldr        w3, [x2, #8]        // decoration           \n\
-  tbz        w3, #0, 1f                                  \n\
-                                                         \n\
-  asr        w4, w3, #16                                 \n\
-  str        w4, [sp, #8]                                \n\
-  mov        w0, #127            // ERROR_PROC_NOT_FOUND \n\
+ noload:                                                 \n\
+  ldr        x2, [sp]          // x2 = func_info* (pushed by dll_chain)\n\
+  ldr        w3, [x2, #8]      // w3 = func_info.decoration\n\
+  tbz        w3, #0, 1f        // notimp bit clear -> fatal\n\
+  asr        w4, w3, #16       // w4 = err (sign-extend high half)\n\
+  str        w4, [sp, #8]      // spill into dll_chain's xzr slot\n\
+  mov        w0, #127          // ERROR_PROC_NOT_FOUND\n\
   bl         SetLastError                                \n\
-  ldr        w0, [sp, #8]                                \n\
-  ldr        x30, [sp, #88]                              \n\
-  add        sp, sp, #96                                 \n\
-  ret                                                   \n\
-1:                                                      \n\
-  add        x1, x2, #20                                 \n\
-  ldur       x3, [x2]                                    \n\
-  ldr        x2, [x3, #8]                                \n\
-  adrp       x0, msg1                                   \n\
-  add        x0, x0, #:lo12:msg1                         \n\
-  bl         api_fatal                                  \n\
+  ldr        w0, [sp, #8]      // reload err as return value\n\
+  ldr        x30, [sp, #88]    // restore caller LR (16 + 72)\n\
+  add        sp, sp, #96       // drop dll_chain (16) + trampoline (80) frames\n\
+  ret                                                    \n\
+1:                                                       \n\
+  add        x1, x2, #20       // x1 = &func_info.name\n\
+  ldr        x3, [x2]          // x3 = dll_info*\n\
+  ldr        x2, [x3, #8]      // x2 = dll_info->handle\n\
+  adrp       x0, msg1                                    \n\
+  add        x0, x0, #:lo12:msg1\n\
+  bl         api_fatal         // never returns          \n\
                                                          \n\
   .globl     dll_func_load                               \n\
-dll_func_load:                                          \n\
-  ldr        x2, [sp]                                    \n\
-  ldur       x3, [x2]                                    \n\
-  ldr        x0, [x3, #8]                                \n\
-  add        x1, x2, #20                                 \n\
+dll_func_load:                                           \n\
+  ldr        x2, [sp]          // x2 = func_info* (pushed by dll_chain)\n\
+  ldr        x3, [x2]          // x3 = dll_info*\n\
+  ldr        x0, [x3, #8]      // x0 = dll handle (arg1 to GetProcAddress)\n\
+  add        x1, x2, #20       // x1 = &func_info.name (arg2)\n\
   bl         GetProcAddress                              \n\
-  cbz        x0, noload                                  \n\
-                                                         \n\
-  ldr        x2, [sp]                                    \n\
-  add        x3, x2, #12                                 \n\
-  str        x0, [x3]                                    \n\
-                                                         \n\
-  sub        x16, x2, #52                                 \n\
-                                                         \n\
-  add        sp, sp, #16                                 \n\
-  ldp        x0, x1, [sp, #0]                            \n\
+  cbz        x0, noload        // 0 -> not found, jump to error path\n\
+  ldr        x2, [sp]          // reload func_info*\n\
+  str        x0, [x2, #12]     // patch func_addr slot (label 3)\n\
+  sub        x16, x2, #52      // x16 = trampoline entry; '#52' = 12B prologue\n\
+                               // + 40B slow path; sync with LoadDLLfuncEx3\n\
+  add        sp, sp, #16       // drop dll_chain frame\n\
+  ldp        x0, x1, [sp, #0]  // restore caller's arg regs\n\
   ldp        x2, x3, [sp, #16]                           \n\
   ldp        x4, x5, [sp, #32]                           \n\
   ldp        x6, x7, [sp, #48]                           \n\
-  ldp        x8, x30, [sp, #64]                          \n\
-  add        sp, sp, #80                                 \n\
-  br         x16                                         \n\
+  ldp        x8, x30, [sp, #64]\n\
+  add        sp, sp, #80       // drop trampoline frame\n\
+  br         x16               // re-enter trampoline; fast path now hits real func\n\
                                                          \n\
   .global    dll_chain                                   \n\
 dll_chain:                                              \n\
-  stp        x0, xzr, [sp, #-16]!                        \n\
-  br         x1                                         \n\
+  stp        x0, xzr, [sp, #-16]! // x0 = func_info* (= ret.high); push for dll_func_load\n\
+  mov        x30, x0          // also pass func_info in x30: a chained INIT_WRAPPER\n\
+                              // (e.g. _wsock_init) reads its arg from x30, but is\n\
+                              // reached here via 'br' which would otherwise leave\n\
+                              // x30 stale.  dll_func_load ignores x30 (reads [sp]).\n\
+  br         x1                   // x1 = dll->init (= ret.low); tail-call resolver\n\
 ");
 #else
 #error unimplemented for this target
@@ -446,7 +436,7 @@ std_dll_init (struct func_info *func)
 	yield ();
       }
     while (InterlockedIncrement (&dll->here));
-  else if ((uintptr_t) dll->handle <= 1)
+  else if (!dll->handle)
     {
       fenv_t fpuenv;
       fegetenv (&fpuenv);
@@ -469,7 +459,7 @@ std_dll_init (struct func_info *func)
 	  if (i < RETRY_COUNT)
 	    yield ();
 	}
-      if ((uintptr_t) dll->handle <= 1)
+      if (!dll->handle)
 	{
 	  if ((func->decoration & 1))
 	    dll->handle = INVALID_HANDLE_VALUE;
@@ -489,9 +479,29 @@ std_dll_init (struct func_info *func)
 
 /* Initialization function for winsock stuff. */
 
-#if defined(__x86_64__) || defined(__aarch64__)
+#if defined(__x86_64__)
 /* See above comment preceeding std_dll_init. */
 INIT_WRAPPER (wsock_init)
+#elif defined(__aarch64__)
+__asm__ ( "\n\
+  .text                                                  \n\
+  .p2align 2                                             \n\
+  .seh_proc _wsock_init                                  \n\
+_wsock_init:                                             \n\
+  stp        x29, x30, [sp, #-16]!  // save fp/lr, open 16-byte frame\n\
+  .seh_save_fplr_x 16                                    \n\
+  .seh_endprologue                                       \n\
+  mov        x0, x30           // x0 = func_info  (the wsock_init() argument)\n\
+  bl         wsock_init        // run WSAStartup; returns x0=func_info, x1=dll_func_load\n\
+  ldp        x29, xzr, [sp], #16  // restore fp, discard saved lr, close frame\n\
+  add        sp, sp, #16       // drop the stranded dll_chain frame so the\n\
+                               // downstream dll_func_load sees exactly one\n\
+                               // dll_chain frame above the trampoline frame\n\
+  adrp       x30, dll_chain    // x30 = &dll_chain so the 'ret' below tail-chains there\n\
+  add        x30, x30, #:lo12:dll_chain // -> dll_chain, which tail-calls x1 (dll_func_load)\n\
+  ret                                                   \n\
+  .seh_endproc                                          \n\
+");
 #else
 #error unimplemented for this target
 #endif
@@ -542,7 +552,7 @@ wsock_init (struct func_info *func)
   return ret.ll;
 }
 
-LoadDLLprime (ws2_32, _wsock_init, 0)
+LoadDLLprime (ws2_32, _wsock_init)
 
 LoadDLLfunc (CheckTokenMembership, advapi32)
 LoadDLLfunc (CreateProcessAsUserW, advapi32)
@@ -718,25 +728,25 @@ LoadDLLfuncEx2 (CreateProfile, userenv, 1, 1)
 LoadDLLfunc (DestroyEnvironmentBlock, userenv)
 LoadDLLfunc (LoadUserProfileW, userenv)
 
-LoadDLLfuncEx3 (waveInAddBuffer, winmm, 1, 0, 1)
-LoadDLLfuncEx3 (waveInClose, winmm, 1, 0, 1)
-LoadDLLfuncEx3 (waveInGetNumDevs, winmm, 1, 0, 1)
-LoadDLLfuncEx3 (waveInOpen, winmm, 1, 0, 1)
-LoadDLLfuncEx3 (waveInPrepareHeader, winmm, 1, 0, 1)
-LoadDLLfuncEx3 (waveInReset, winmm, 1, 0, 1)
-LoadDLLfuncEx3 (waveInStart, winmm, 1, 0, 1)
-LoadDLLfuncEx3 (waveInUnprepareHeader, winmm, 1, 0, 1)
-LoadDLLfuncEx3 (waveOutClose, winmm, 1, 0, 1)
-LoadDLLfuncEx3 (waveOutGetNumDevs, winmm, 1, 0, 1)
-LoadDLLfuncEx3 (waveOutGetVolume, winmm, 1, 0, 1)
-LoadDLLfuncEx3 (waveOutOpen, winmm, 1, 0, 1)
-LoadDLLfuncEx3 (waveOutPrepareHeader, winmm, 1, 0, 1)
-LoadDLLfuncEx3 (waveOutReset, winmm, 1, 0, 1)
-LoadDLLfuncEx3 (waveOutSetVolume, winmm, 1, 0, 1)
-LoadDLLfuncEx3 (waveOutUnprepareHeader, winmm, 1, 0, 1)
-LoadDLLfuncEx3 (waveOutWrite, winmm, 1, 0, 1)
-LoadDLLfuncEx3 (waveOutMessage, winmm, 1, 0, 1)
-LoadDLLfuncEx3 (waveOutGetDevCapsA, winmm, 1, 0, 1)
+LoadDLLfuncEx3 (waveInAddBuffer, winmm, 1, 0)
+LoadDLLfuncEx3 (waveInClose, winmm, 1, 0)
+LoadDLLfuncEx3 (waveInGetNumDevs, winmm, 1, 0)
+LoadDLLfuncEx3 (waveInOpen, winmm, 1, 0)
+LoadDLLfuncEx3 (waveInPrepareHeader, winmm, 1, 0)
+LoadDLLfuncEx3 (waveInReset, winmm, 1, 0)
+LoadDLLfuncEx3 (waveInStart, winmm, 1, 0)
+LoadDLLfuncEx3 (waveInUnprepareHeader, winmm, 1, 0)
+LoadDLLfuncEx3 (waveOutClose, winmm, 1, 0)
+LoadDLLfuncEx3 (waveOutGetNumDevs, winmm, 1, 0)
+LoadDLLfuncEx3 (waveOutGetVolume, winmm, 1, 0)
+LoadDLLfuncEx3 (waveOutOpen, winmm, 1, 0)
+LoadDLLfuncEx3 (waveOutPrepareHeader, winmm, 1, 0)
+LoadDLLfuncEx3 (waveOutReset, winmm, 1, 0)
+LoadDLLfuncEx3 (waveOutSetVolume, winmm, 1, 0)
+LoadDLLfuncEx3 (waveOutUnprepareHeader, winmm, 1, 0)
+LoadDLLfuncEx3 (waveOutWrite, winmm, 1, 0)
+LoadDLLfuncEx3 (waveOutMessage, winmm, 1, 0)
+LoadDLLfuncEx3 (waveOutGetDevCapsA, winmm, 1, 0)
 
 LoadDLLfunc (accept, ws2_32)
 LoadDLLfunc (bind, ws2_32)
