@@ -61,7 +61,7 @@ jobs:
       - name: Checkout MSYS2-packages (toolchain PKGBUILDs)
         uses: actions/checkout@v4
         with:
-          repository: qcom-eng-691/MSYS2-packages
+          repository: mayankag-qti/MSYS2-packages-arm64
           ref: ${{ github.event.inputs.pkgs_branch || 'ci/cross-runtime-packaging' }}
           path: _pkgs
           token: ${{ secrets.CI_TOKEN || github.token }}
@@ -116,14 +116,14 @@ jobs:
     timeout-minutes: 330
     env:
       ROOT: /c/msys2-arm64-build
-      PKGS_REPO: https://github.com/qcom-eng-691/MSYS2-packages.git
+      PKGS_REPO: https://github.com/mayankag-qti/MSYS2-packages-arm64.git
       PKGS_BRANCH: ${{ github.event.inputs.pkgs_branch || 'ci/cross-runtime-packaging' }}
       # Never block on a git credential prompt (private org clones) — fail fast.
       GIT_TERMINAL_PROMPT: "0"
     steps:
       - uses: actions/checkout@v4
       - name: Setup MSYS2 (x86_64, emulated build host)
-        uses: qcom-eng-691/setup-msys2@v2
+        uses: msys2/setup-msys2@v2
         with:
           msystem: MSYS
           # Skip the action's internal -Syuu: on the ARM64 runner image the
@@ -194,7 +194,7 @@ jobs:
     timeout-minutes: 330
     env:
       ROOT: /c/msys2-arm64-build
-      PKGS_REPO: https://github.com/qcom-eng-691/MSYS2-packages.git
+      PKGS_REPO: https://github.com/mayankag-qti/MSYS2-packages-arm64.git
       PKGS_BRANCH: ${{ github.event.inputs.pkgs_branch || 'ci/cross-runtime-packaging' }}
       # Never block on a git credential prompt (private org clones) — fail fast.
       GIT_TERMINAL_PROMPT: "0"
@@ -218,7 +218,7 @@ jobs:
           restore-keys: |
             ${{ needs.compute-key.outputs.key }}-p1
       - name: Setup MSYS2 (x86_64, emulated build host)
-        uses: qcom-eng-691/setup-msys2@v2
+        uses: msys2/setup-msys2@v2
         with:
           msystem: MSYS
           update: false        # see arm64-mingw (keyring "unknown trust")
@@ -278,7 +278,7 @@ jobs:
       contents: write        # create/refresh the toolchain release
     env:
       ROOT: /c/msys2-arm64-build
-      PKGS_REPO: https://github.com/qcom-eng-691/MSYS2-packages.git
+      PKGS_REPO: https://github.com/mayankag-qti/MSYS2-packages-arm64.git
       PKGS_BRANCH: ${{ github.event.inputs.pkgs_branch || 'ci/cross-runtime-packaging' }}
       # Never block on a git credential prompt (private org clones) — fail fast.
       GIT_TERMINAL_PROMPT: "0"
@@ -291,7 +291,7 @@ jobs:
           key: ${{ needs.compute-key.outputs.key }}-p2
           fail-on-cache-miss: true
       - name: Setup MSYS2 (x86_64, emulated build host)
-        uses: qcom-eng-691/setup-msys2@v2
+        uses: msys2/setup-msys2@v2
         with:
           msystem: MSYS
           update: false        # see arm64-mingw (keyring "unknown trust")
