@@ -1,0 +1,6 @@
+# aarch64-specific exports
+# These symbols are available on AArch64 architecture
+
+LIBRARY "msys-2.0.dll" BASE=0x180040000
+
+EXPORTS
