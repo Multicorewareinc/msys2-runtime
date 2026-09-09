@@ -16,8 +16,12 @@ logbl (long double x)
 {
   long double res = 0.0L;
 
+#if defined(__x86_64__) || defined(__i386__)
   asm volatile (
        "fxtract\n\t"
        "fstp	%%st" : "=t" (res) : "0" (x));
+#elif defined(__aarch64__)
+  res = 0.0;
+#endif
   return res;
 }
